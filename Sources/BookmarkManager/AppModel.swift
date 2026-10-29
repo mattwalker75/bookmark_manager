@@ -52,12 +52,10 @@ final class AppModel: ObservableObject {
     var lookInForce: Appearance { previewLook ?? settings.effectiveAppearance }
 
     let store: LibraryStore
+    /// the site icons; views that show one observe it directly (SiteIcon), so an arriving icon redraws only them
     let icons: IconCache
-    /// the one model, for windows that are not SwiftUI scenes (the secret windows)
-    nonisolated(unsafe) static weak var shared: AppModel?
-    /// the library (or its secrets) could not be read at launch
+    /// the library (or its secrets) could not be read at launch: no sample data, and the notice says what was kept
     private(set) var loadTrouble = false
-    private var iconFollower: AnyCancellable?
 
     init() {
         store = LibraryStore()
@@ -70,10 +68,8 @@ final class AppModel: ObservableObject {
         selectedTabId = lib.tabs[0].id
         selectedPath = FolderPath(tab: lib.tabs[0].id)
         notice = first
-        AppModel.shared = self
         Theme.apply(settings)
         icons.enabled = settings.fetchIcons
-        iconFollower = icons.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
     }
 
     // MARK: reading
@@ -129,20 +125,30 @@ final class AppModel: ObservableObject {
 
     // MARK: saving
 
-    private func save() {
-        do { try store.save(library) } catch { notice = Notice(title: "The bookmarks could not be saved", message: (error as? BMError)?.message ?? error.localizedDescription) }
+    /// Saves; false (with a notice) when it could not be written — the caller puts the old library back, so what
+    /// the window shows is always what the disk holds.
+    private func save() -> Bool {
+        do { try store.save(library) } catch { notice = Notice(title: "The bookmarks could not be saved", message: (error as? BMError)?.message ?? error.localizedDescription); return false }
         fixSelection()
+        return true
     }
 
-    /// Runs a change on the library; a refusal becomes a notice and nothing is saved. True when it went through.
+    /// Runs a change on the library; a refusal (or a failed save) becomes a notice and nothing changes. True when it went through.
     @discardableResult
     func change(_ title: String = "That can't be done", _ work: (inout Library) throws -> Void) -> Bool {
         var lib = library
         do { try work(&lib) } catch { notice = Notice(title: title, message: (error as? BMError)?.message ?? error.localizedDescription); return false }
         guard lib != library else { return true }
+        let old = library
         library = lib
-        save()
+        if !save() { library = old; fixSelection(); return false }
         return true
+    }
+
+    /// What a change would say if it were refused, without doing it (for panes that show the reason in place).
+    func reason(_ work: (inout Library) throws -> Void) -> String? {
+        var lib = library
+        do { try work(&lib); return nil } catch { return (error as? BMError)?.message ?? error.localizedDescription }
     }
 
     // MARK: tabs
@@ -187,6 +193,8 @@ final class AppModel: ObservableObject {
     func drop(_ token: String, to dest: FolderPath, before: UUID? = nil) -> Bool {
         if token.hasPrefix("tab:") { return false }
         guard let item = DragItem(token: token) else { return false }
+        // let go where the drag began (a directory on its own row): nothing happens, no alert
+        if case .folder(let id) = item, library.path(toFolder: id) == dest { return false }
         return move(item, to: dest, before: before)
     }
     func canDrop(_ token: String, to dest: FolderPath) -> Bool {
@@ -227,11 +235,15 @@ final class AppModel: ObservableObject {
 
     func importFile(_ f: ExportFile, mode: ImportMode) -> [String] {
         let (lib, notes) = Transfer.apply(f, to: library, mode: mode)
-        for id in library.allBookmarks.map(\.id) where lib.bookmark(id) == nil { SecretWindows.close(id) }
+        let old = library
         library = lib
-        save()
+        guard save() else { library = old; fixSelection(); return [] }
+        // open secret windows: closed for bookmarks that are gone, brought up to date for the rest (a replace keeps ids)
+        let stillThere = Set(lib.allBookmarks.map(\.id))
+        for id in old.allBookmarks.map(\.id) where !stillThere.contains(id) { SecretWindows.close(id) }
+        for b in lib.allBookmarks { SecretWindows.refresh(b) }
         if mode == .replace { selectTab(library.tabs[0].id) }
-        for b in library.allBookmarks { icons.warm(b.url) }
+        // icons are fetched as rows come into view — not all at once here
         return notes
     }
 
@@ -239,10 +251,10 @@ final class AppModel: ObservableObject {
 
     /// BOOKMARKMANAGER_SAMPLE=1 with an empty BOOKMARKMANAGER_HOME fills in example bookmarks (for screenshots)
     func addSampleIfAsked() {
-        guard ProcessInfo.processInfo.environment["BOOKMARKMANAGER_SAMPLE"] == "1", library.allBookmarks.isEmpty, library.tabs.count == 1 else { return }
+        guard !loadTrouble, ProcessInfo.processInfo.environment["BOOKMARKMANAGER_SAMPLE"] == "1", library.allBookmarks.isEmpty, library.tabs.count == 1 else { return }
         library = Sample.library()
         selectTab(library.tabs[0].id)
-        save()
+        _ = save()
     }
 }
 

@@ -50,3 +50,20 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   the open app. ⇧⌘N follows the New directory rule (inside, or beside when the levels don't allow deeper) instead
   of offering a directory that is always refused. Import… → Replace everything asks once more. Wording made
   consistent (color, directory list, level-3 directory, no bundle ids); docs corrected where they overstated.
+- 2026-10-28: **Deep review, QA pass.** Two copies of the app on one bookmarks file silently overwrote each other:
+  a second copy of the app now quits and brings the first forward, and a save is refused (with a plain sentence)
+  when the file was changed by something else since it was read; a change that can't be saved is put back, so
+  the window never shows what the disk doesn't hold. Addresses: javascript:, data: and the like are refused as
+  not for a browser; a space inside a real address is written as %20; "two words" stays refused. Names made only of
+  invisible characters are refused. An export's version must be at least 1. Duplicate tab names are noted once.
+  A refused directory-levels change is shown under the picker in Settings instead of as an alert behind it.
+- 2026-10-28: **Deep review, app layer (17 verified findings).** The icon fetch asked for a bookmark's full
+  address — path and query included — so a bookmark like http://router/reboot would have been visited to find
+  its icon; only the site's root is requested now. The editor's icon preview looked up every half-typed host;
+  it now shows only what is already here. Fetches run four at a time instead of all at once, and an import
+  fetches nothing (rows fetch as they appear). Open secret windows are brought up to date after an import and
+  follow Appearance changes. The Dock icon brings the main window back when only a secret window is open.
+  ⌘E, Rename Tab… and Sort are off while search results are showing. A directory dropped on its own row no
+  longer alerts. The search match mark uses the accent (readable on tinted rows) instead of a fixed yellow.
+  The browser list leaves out terminals that merely claim https:. A color's name is saved when typing pauses.
+  Arriving icons redraw only the rows that show them; no per-bookmark window-frame leftovers in preferences.

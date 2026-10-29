@@ -31,7 +31,10 @@ hidden until you ask for it.
 - A bookmark has:
   - **Name** — what the row shows. Click it to open the address in your browser.
   - **Description** — optional, a sentence or two, shown in smaller text under the name.
-  - **Address** — `https://…` (or just `example.com`; https is assumed). The site's icon is fetched for the row.
+  - **Address** — `https://…` (or just `example.com`; https is assumed; a space inside is written as %20).
+    `javascript:` and `data:` are not addresses a browser should open from a bookmark, so they are refused.
+    The site's icon is fetched for the row — from the site's front page only, never from the bookmark's own
+    address, and a few at a time.
   - **Tags** — optional words, separated by commas, for the search only. They never show on the row.
   - **Color** — one of the color codes from Settings; the row gets a light wash of that color.
   - **Secret** — tick *This bookmark has a secret* and type as many lines as you like (a user name, a password, a
@@ -70,7 +73,8 @@ hidden until you ask for it.
 - On the rows only the tint shows; the name appears in the editor's color pills and in Settings.
 
 ## Settings
-- **General** — *Open bookmarks in*: the Mac's default browser, or any browser installed on this Mac. *Directory
+- **General** — *Open bookmarks in*: the Mac's default browser (whatever app that is), or any browser installed
+  on this Mac. *Directory
   levels inside a tab*. *Fetch site icons* (off = no network at all; icons already fetched still show). Where
   the files are kept, with Show in Finder.
 - **Color codes** — above.
@@ -90,6 +94,11 @@ hidden until you ask for it.
   - **Add its tabs beside mine** — the file's tabs are added as copies; yours stay as they are.
   - **Replace everything here** — what is here is thrown away first (it asks again). If the file was exported
     without secrets, bookmarks that are already here keep the secrets they have.
+
+## One copy at a time
+Opening Bookmark Manager twice just brings the open one forward. If something else changes the bookmarks file
+while the app is open (a second copy run by hand, an edit to the file), the next change is refused with a
+sentence saying so, and nothing is lost: quit the other copy, then quit and reopen this one.
 
 ## Where things are kept
 `~/Library/Application Support/Bookmark Manager/` — `library.json` (the bookmarks, no secrets), `secrets.enc`

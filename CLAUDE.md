@@ -57,12 +57,28 @@ it is not a developer: every message is a plain sentence.
    results are grouped by tab with the path; "Show in place" selects the directory and flashes the row (`highlightId`).
 10. **Site icons** are fetched once per host into `<home>/icons/<host>.png` (`<host>_<port>.png` with a port) (any certificate accepted, http allowed via
     `NSAllowsArbitraryLoads` — on its own, see App Starter), a failure is remembered until relaunch, the link glyph
-    is the fallback; Settings → General can turn fetching off. Nothing else touches the network.
+    is the fallback; Settings → General can turn fetching off. Nothing else touches the network. Review rules: only
+    the site ROOT is ever requested (never a bookmark's path/query — http://router/reboot must not be visited);
+    at most `IconCache.atOnce` (4) fetches run at once, the rest queue; the editor's icon is cache-only
+    (`SiteIcon(fetch: false)`) so half-typed hosts are never looked up; an import warms nothing (rows fetch lazily);
+    `SiteIcon` observes `IconCache` directly (an arriving icon redraws only the rows that show it).
 11. **Files are never lost:** a damaged library.json / unreadable secrets are moved aside (`*.unreadable-<date>`) and
     reported; a damaged library.json takes a COPY of secrets.enc with it (review: the next save would prune them).
     Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json, then the prune — a failed library
     write loses no secret. Repeated ids are repaired on load and on import. Settings decode every field with a default.
 12. **Text fields are `PlainTextField` / `Field`**, the secret is a `TextBox` (data_syncer rule 14b). Base text 14.
+12a. **One copy at a time, and the disk is the truth** (review, Oct 28 2026): `AppDelegate` quits a second copy of the
+    .app and brings the first forward; `LibraryStore` remembers library.json's size+date and refuses a save when
+    something else wrote the file since (two copies on one home, a hand edit); `AppModel.change` puts the old
+    library back when a save fails, so the window never shows what the disk doesn't hold. A refusal that belongs to
+    the Settings window (directory levels) is shown there, inline (`AppModel.reason`), not as a notice behind it.
+12b. **Addresses:** no scheme → https:// in front (but "two words" is refused); a space inside a real address is
+    written as %20; javascript:, data:, vbscript:, blob: are refused as "not an address a browser should open".
+    Names made only of blanks or invisible characters (zero-width space, Hangul filler) are refused.
+12c. **The browser list** is apps that claim https: AND file: (every real browser; a terminal that claims https:
+    doesn't) or are in `Browsers.known`; the Mac's default can still be any app. ⌘E / Rename Tab… / Sort are off
+    while search results are showing (they would act on the hidden selection). A directory dropped on its own row
+    is a silent no-op. Secret windows observe the model (look changes) and are refreshed after an import.
 13. **Scripts:** BUILD_APP.sh / INSTALL_APP.sh like app_starter's; idempotent, plain-spoken. **Commits:** one per
     feature with a dated CHANGELOG entry; explicit `git add <paths>`; never push — Matt pushes.
 14. **Testing:** `swift test`; never the real Application Support — `BOOKMARKMANAGER_HOME=<scratch>` for the app,

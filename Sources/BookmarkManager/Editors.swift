@@ -39,7 +39,7 @@ struct BookmarkEditor: View {
                 LabeledContent("Address") {
                     HStack(spacing: 8) {
                         PlainTextField("https://example.com/page", text: $bookmark.url, monospaced: true, label: "Address")
-                        SiteIcon(address: bookmark.url, size: 24)
+                        SiteIcon(address: bookmark.url, size: 24, fetch: false)
                     }
                 }
                 Field("Tags", $tagsText, "Optional — words for the search, separated by commas")

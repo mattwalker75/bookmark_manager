@@ -87,6 +87,7 @@ public enum Transfer {
         }
         guard f.app == "Bookmark Manager" else { throw BMError("That file isn't a Bookmark Manager export (it says it is from “\(f.app)”).") }
         guard f.version <= 1 else { throw BMError("That file was made by a newer Bookmark Manager. Update this one first.") }
+        guard f.version >= 1 else { throw BMError("That file's version number (\(f.version)) isn't one Bookmark Manager has ever written.") }
         return f
     }
 
@@ -114,9 +115,13 @@ public enum Transfer {
             }
         }
         var ids = Set<UUID>()
-        var tabNames = Set<String>()
+        var tabNames = Set<String>(), warnedNames = Set<String>()
         for t in lib.tabs {
-            if !tabNames.insert(t.name.lowercased()).inserted { r.problems.append(Problem(place: t.name, text: "Two tabs have this name. Importing works, but it will be confusing.", stops: false)) }
+            let key = t.name.lowercased()
+            if !tabNames.insert(key).inserted, warnedNames.insert(key).inserted {
+                let n = lib.tabs.filter { $0.name.lowercased() == key }.count
+                r.problems.append(Problem(place: t.name, text: "\(n) tabs have this name. Importing works, but it will be confusing.", stops: false))
+            }
             check(t, level: 0, place: [], lib: lib, colorIds: colorIds, ids: &ids, report: &r)
         }
         if r.withSecrets > 0 && !f.secretsIncluded {

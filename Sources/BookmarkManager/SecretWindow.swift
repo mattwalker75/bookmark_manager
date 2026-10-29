@@ -13,14 +13,13 @@ enum SecretWindows {
     static func show(_ b: Bookmark, model: AppModel) {
         if let w = windows[b.id] { holders[b.id]?.bookmark = b; w.makeKeyAndOrderFront(nil); return }
         let holder = SecretHolder(bookmark: b)
-        let view = SecretView(holder: holder, model: model).environmentObject(model)
+        let view = SecretView(holder: holder, model: model).environmentObject(model).environmentObject(model.icons)
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 320), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         w.title = "Secret · \(b.name)"
         w.isReleasedWhenClosed = false
         w.contentView = NSHostingView(rootView: view)
         w.minSize = NSSize(width: 360, height: 220)
         w.center()
-        w.setFrameAutosaveName("secret-\(b.id.uuidString)")
         w.delegate = Closer.shared
         windows[b.id] = w; holders[b.id] = holder
         w.makeKeyAndOrderFront(nil)
@@ -57,7 +56,7 @@ final class SecretHolder: ObservableObject {
 
 struct SecretView: View {
     @ObservedObject var holder: SecretHolder
-    let model: AppModel
+    @ObservedObject var model: AppModel
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {

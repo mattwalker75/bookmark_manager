@@ -36,9 +36,14 @@ Search is computed on demand from `query` (`Library.search`), cheap for a few th
 Secret windows are plain `NSWindow`s kept in `SecretWindows` (one per bookmark id), fed through a `SecretHolder`
 so an edit updates an open window and a delete closes it.
 
-Site icons: `IconCache.image(for:)` answers from memory or `<home>/icons/<host>.png`, else starts one fetch
-(`IconFetcher`: the page's HTML → `Favicons.candidates` → first picture that decodes, scaled to 64 px PNG).
-A host that fails is skipped until the next launch.
+Site icons: `IconCache.image(for:fetch:)` answers from memory or `<home>/icons/<host>.png`, else queues one fetch
+(at most `atOnce` = 4 running; `IconFetcher`: the site ROOT's HTML — never the bookmark's path — →
+`Favicons.candidates` → first picture that decodes, scaled to 64 px PNG). A host that fails is skipped until the
+next launch. `SiteIcon` observes the cache directly; the editor passes `fetch: false`.
+
+Saving: `LibraryStore` remembers library.json's size and date; `save` refuses when the file changed underneath
+(another copy, a hand edit) and `AppModel.change` then puts the old library back. `AppDelegate` keeps one copy of
+the .app running.
 
 ## Where things are kept
 `Home.folder()` = `~/Library/Application Support/Bookmark Manager/`, or `$BOOKMARKMANAGER_HOME`.

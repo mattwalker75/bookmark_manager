@@ -145,7 +145,8 @@ enum Highlight {
             var from = lower.startIndex
             while let r = lower.range(of: w, range: from..<lower.endIndex) {
                 if let lo = AttributedString.Index(r.lowerBound, within: s), let hi = AttributedString.Index(r.upperBound, within: s) {
-                    s[lo..<hi].backgroundColor = Color.yellow.opacity(0.45)
+                    s[lo..<hi].backgroundColor = Theme.accent.opacity(0.35)
+                    s[lo..<hi].font = .system(size: 14, weight: .bold)
                 }
                 from = r.upperBound
             }

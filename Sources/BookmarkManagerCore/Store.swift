@@ -39,6 +39,9 @@ public final class LibraryStore: @unchecked Sendable {
     public let secrets: SecretBox
     /// a warning from the last load that did not stop it (the secrets could not be read)
     public private(set) var problem: String?
+    /// library.json as this store last read or wrote it, so a change made by another copy of the app is noticed
+    private var lastSeen: (size: Int, modified: Date)?
+    private let lock = NSLock()
 
     public init(folder: URL = Home.folder()) {
         self.folder = folder
@@ -87,7 +90,22 @@ public final class LibraryStore: @unchecked Sendable {
             problem = "\((error as? BMError)?.message ?? error.localizedDescription) The old files were kept as \([a, k].compactMap { $0 }.joined(separator: " and ")). Your bookmarks loaded without their secrets: type them again in each bookmark's editor."
         }
         for t in lib.tabs.indices { LibraryStore.fill(&lib.tabs[t], values) }
+        remember()
         return lib
+    }
+
+    private func stamp() -> (size: Int, modified: Date)? {
+        guard let a = try? FileManager.default.attributesOfItem(atPath: url.path), let size = a[.size] as? Int, let m = a[.modificationDate] as? Date else { return nil }
+        return (size, m)
+    }
+    private func remember() { lock.lock(); lastSeen = stamp(); lock.unlock() }
+
+    /// True when library.json was written by someone else since this store last read or wrote it.
+    public var changedOnDisk: Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let now = stamp() else { return lastSeen != nil }
+        guard let seen = lastSeen else { return true }
+        return now.size != seen.size || now.modified != seen.modified
     }
     private static func fill(_ f: inout Folder, _ values: [String: String]) {
         for i in f.bookmarks.indices where f.bookmarks[i].hasSecret { f.bookmarks[i].secret = values[f.bookmarks[i].id.uuidString] ?? "" }
@@ -97,6 +115,11 @@ public final class LibraryStore: @unchecked Sendable {
     /// Saves the library; the secrets go to the encrypted file, never into library.json.
     public func save(_ lib: Library) throws {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        // another copy of Bookmark Manager (or a hand edit) wrote the file since this one read it: writing now would
+        // silently throw that away (two copies on one home, found in review)
+        if lastSeen != nil, changedOnDisk {
+            throw BMError("The bookmarks file was changed by something else — another copy of Bookmark Manager, most likely — since this one read it, so this change was not saved to avoid losing theirs. Quit the other copy, then quit and reopen this one and make the change again.")
+        }
         var plain = lib
         var values: [String: String] = [:]
         for t in plain.tabs.indices { LibraryStore.strip(&plain.tabs[t], into: &values) }
@@ -108,6 +131,7 @@ public final class LibraryStore: @unchecked Sendable {
         try JSON.encoder.encode(LibraryFile(library: plain)).write(to: url, options: .atomic)
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         if Set(old.keys) != Set(values.keys) { try secrets.save(values) }
+        remember()
     }
     private static func strip(_ f: inout Folder, into values: inout [String: String]) {
         for i in f.bookmarks.indices {

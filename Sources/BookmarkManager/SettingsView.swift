@@ -24,6 +24,7 @@ struct GeneralPane: View {
     @EnvironmentObject var model: AppModel
     @State private var browsers: [Browser] = []
     @State private var depth = 2
+    @State private var depthProblem: String?
 
     var body: some View {
         Form {
@@ -35,7 +36,7 @@ struct GeneralPane: View {
                         Text("Not installed any more").tag(String?.some(chosen))
                     }
                 }
-                Text("Every bookmark opens in this browser when you click its name. The list is the browsers installed on this Mac.")
+                Text("Every bookmark opens in this browser when you click its name. The list is the browsers installed on this Mac; the Mac's own default can be any app.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
             Section {
@@ -44,11 +45,14 @@ struct GeneralPane: View {
                 }
                 .onChange(of: depth) { _, d in
                     guard d != model.library.maxDepth else { return }
+                    // a refusal is shown here, under the picker (a notice would open behind this window)
+                    if let why = model.reason({ try $0.setMaxDepth(d) }) { depthProblem = why; depth = model.library.maxDepth; return }
+                    depthProblem = nil
                     model.setMaxDepth(d)
-                    if model.library.maxDepth != d { depth = model.library.maxDepth }   // refused: the picker goes back
+                    if model.library.maxDepth != d { depth = model.library.maxDepth }
                 }
-                Text("2 means a directory and one sub-directory in it (the usual). It can't be lowered while a deeper directory exists; move or delete those first.")
-                    .font(DS.secondary).foregroundStyle(.secondary)
+                Text(depthProblem ?? "2 means a directory and one sub-directory in it (the usual). It can't be lowered while a deeper directory exists; move or delete those first.")
+                    .font(DS.secondary).foregroundStyle(depthProblem == nil ? Color.secondary : Theme.problem)
             }
             Section {
                 Toggle("Fetch site icons", isOn: $model.settings.fetchIcons)
@@ -136,6 +140,7 @@ struct ColorCodeRow: View {
     @State private var color: Color = .gray
     @State private var name = ""
     @State private var loaded = false
+    @State private var nameSave: Task<Void, Never>?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -156,9 +161,16 @@ struct ColorCodeRow: View {
         .onChange(of: color) { _, c in guard loaded else { return }; let rgb = RGB(c); if rgb != code.rgb { model.updateColor(code.id, rgb: rgb) } }
         .onChange(of: name) { _, n in
             guard loaded else { return }
-            let t = n.trimmingCharacters(in: .whitespaces)
-            if !t.isEmpty, t != code.name { model.updateColor(code.id, name: t) }
+            // saved once typing pauses, not on every letter (each save rewrites the library file)
+            nameSave?.cancel()
+            nameSave = Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                guard !Task.isCancelled else { return }
+                let t = n.trimmingCharacters(in: .whitespaces)
+                if !t.isEmpty, t != code.name { model.updateColor(code.id, name: t) }
+            }
         }
+        .onDisappear { nameSave?.cancel(); let t = name.trimmingCharacters(in: .whitespaces); if loaded, !t.isEmpty, t != code.name { model.updateColor(code.id, name: t) } }
     }
 }
 

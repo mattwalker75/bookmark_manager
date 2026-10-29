@@ -72,7 +72,7 @@ struct MainWindow: View {
                     // the Settings scene's own action is not reachable from here on every macOS: show the same view in a plain window
                     let w = NSWindow(contentRect: NSRect(x: 600, y: 300, width: 680, height: 560), styleMask: [.titled, .closable], backing: .buffered, defer: false)
                     w.title = "Bookmark Manager Settings"; w.isReleasedWhenClosed = false
-                    w.contentView = NSHostingView(rootView: SettingsView().environmentObject(model).preferredColorScheme(model.lookInForce.colorScheme).tint(Theme.accent).font(DS.body))
+                    w.contentView = NSHostingView(rootView: SettingsView().environmentObject(model).environmentObject(model.icons).preferredColorScheme(model.lookInForce.colorScheme).tint(Theme.accent).font(DS.body))
                     w.makeKeyAndOrderFront(nil)
                 }
             }
@@ -556,11 +556,13 @@ struct BookmarkRow: View {
 
 /// The site's icon, or the link glyph until (or unless) one is found.
 struct SiteIcon: View {
-    @EnvironmentObject var model: AppModel
+    @EnvironmentObject var icons: IconCache
     let address: String
     var size: CGFloat = 28
+    /// off in the editor: a half-typed address must not be looked up
+    var fetch = true
     var body: some View {
-        if let img = model.icons.image(for: address) {
+        if let img = icons.image(for: address, fetch: fetch) {
             Image(nsImage: img).resizable().interpolation(.high).frame(width: size - 6, height: size - 6)
                 .frame(width: size, height: size)
                 .background(Color.white.opacity(0.9), in: RoundedRectangle(cornerRadius: DS.radiusSmall))

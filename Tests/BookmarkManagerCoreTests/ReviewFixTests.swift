@@ -41,7 +41,8 @@ final class ReviewFixTests: XCTestCase {
         try FileManager.default.removeItem(atPath: s.file("library.json"))
         try good.write(to: s.url.appendingPathComponent("library.json"))
         XCTAssertEqual(try LibraryStore(folder: s.url).load().bookmark(Sample.postgres)?.secret, "user: admin\npassword: hunter2\n\ntoken: abc")
-        // and a good save prunes the secret that nothing needs
+        // and a good save (after a fresh read, since the file was put back by hand) prunes the secret that nothing needs
+        _ = try store.load()
         try store.save(lib)
         XCTAssertNil(try store.secrets.load()[Sample.postgres.uuidString])
     }
@@ -154,5 +155,58 @@ final class ReviewFixTests: XCTestCase {
         file.secretsIncluded = false
         let (lib, _) = Transfer.apply(file, to: Library.fresh(), mode: .replace)
         XCTAssertEqual(lib.allBookmarks.filter(\.hasSecret).map(\.secret), ["", "", ""])
+    }
+}
+
+/// The QA pass of Oct 28 2026.
+final class QAFixTests: XCTestCase {
+    func testTwoCopiesOnOneHomeDoNotOverwriteEachOther() throws {
+        let s = Scratch()
+        let a = LibraryStore(folder: s.url), b = LibraryStore(folder: s.url)
+        try a.save(Sample.library())
+        var libB = try b.load()
+        var libA = try a.load()
+        try libB.addTab("From B")
+        try b.save(libB)
+        try libA.addTab("From A")
+        XCTAssertThrowsBM(try a.save(libA), containing: "changed by something else")
+        XCTAssertEqual(try LibraryStore(folder: s.url).load().tabs.map(\.name), ["Work", "Home", "From B"], "B's change is still there")
+        XCTAssertTrue(a.changedOnDisk)
+        // a fresh read brings A up to date and it can save again
+        libA = try a.load(); try libA.addTab("From A")
+        XCTAssertNoThrow(try a.save(libA))
+    }
+
+    func testAddressesSpacesAndDangerousSchemes() {
+        XCTAssertEqual(Bookmark.link(from: "https://example.com/a b")?.absoluteString, "https://example.com/a%20b")
+        XCTAssertNil(Bookmark.link(from: "javascript:alert(1)"))
+        XCTAssertNil(Bookmark.link(from: "JavaScript:alert(1)"))
+        XCTAssertNil(Bookmark.link(from: "data:text/html,hi"))
+        XCTAssertEqual(Bookmark.link(from: "file:///etc/hosts")?.scheme, "file")
+        XCTAssertEqual(Bookmark.link(from: "tel:+15551234")?.scheme, "tel")
+        XCTAssertEqual(Bookmark.link(from: "smb://nas/share")?.scheme, "smb")
+        var lib = Library.fresh()
+        XCTAssertThrowsBM(try lib.addBookmark(Bookmark(name: "x", url: "javascript:alert(1)"), in: FolderPath(tab: lib.tabs[0].id)), containing: "isn't an address a browser should open")
+    }
+
+    func testInvisibleNamesAreBlank() {
+        var lib = Library.fresh()
+        XCTAssertThrowsBM(try lib.addTab("\u{3164}\u{200B}"), containing: "needs a name")
+        XCTAssertThrowsBM(try lib.addBookmark(Bookmark(name: "\u{FEFF}", url: "https://x.example"), in: FolderPath(tab: lib.tabs[0].id)), containing: "needs a name")
+    }
+
+    func testVersionMustBeAtLeastOne() {
+        for v in ["0", "-3"] {
+            XCTAssertThrowsBM(try Transfer.read(Data(#"{"app":"Bookmark Manager","version":\#(v),"secretsIncluded":false,"library":{"tabs":[{"name":"T"}]}}"#.utf8)), containing: "isn't one Bookmark Manager has ever written")
+        }
+    }
+
+    func testDuplicateTabNamesAreNotedOnce() throws {
+        var lib = Sample.library()
+        _ = try lib.addTab("Work"); _ = try lib.addTab("work")
+        let r = Transfer.validate(try Transfer.export(lib, includeSecrets: false))
+        let notes = r.notes.filter { $0.text.contains("have this name") }
+        XCTAssertEqual(notes.count, 1)
+        XCTAssertTrue(notes[0].text.hasPrefix("3 tabs have this name"))
     }
 }

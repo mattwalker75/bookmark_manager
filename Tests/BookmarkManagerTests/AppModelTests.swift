@@ -94,8 +94,12 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(m.library.location(ofBookmark: b.id), FolderPath([tab, a.id]))
         XCTAssertFalse(m.drop("tab:\(tab.uuidString)", to: FolderPath([tab, a.id])))
         XCTAssertFalse(m.drop("rubbish", to: FolderPath([tab, a.id])))
-        // a directory into itself is refused with a notice
+        // a directory dropped on its own row is a silent no-op; moved INTO its own sub-directory it is refused with a notice
         XCTAssertFalse(m.drop(DragItem.folder(a.id).token, to: FolderPath([tab, a.id])))
+        XCTAssertNil(m.notice)
+        m.addFolder(name: "Inside A", description: "", colorId: nil, in: FolderPath([tab, a.id]))
+        let inside = try XCTUnwrap(m.library.folder(a.id)?.folders.first)
+        XCTAssertFalse(m.drop(DragItem.folder(a.id).token, to: FolderPath([tab, a.id, inside.id])))
         XCTAssertEqual(m.notice?.title, "It wasn't moved")
         XCTAssertTrue(m.canDrop(DragItem.bookmark(b.id).token, to: FolderPath(tab: tab)))
     }
@@ -171,5 +175,78 @@ extension AppModel {
     /// Puts a whole library in place (through the normal import path).
     func importFileForTest(_ lib: Library) {
         _ = importFile(ExportFile(secretsIncluded: true, library: lib), mode: .replace)
+    }
+}
+
+@MainActor
+final class QAModelTests: XCTestCase {
+    private var home: URL!
+    override func setUp() async throws {
+        home = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarkmanager-qa-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        setenv("BOOKMARKMANAGER_HOME", home.path, 1)
+    }
+    override func tearDown() async throws { unsetenv("BOOKMARKMANAGER_HOME"); try? FileManager.default.removeItem(at: home) }
+
+    /// A change that can't be saved is put back, so the window never shows something the disk doesn't hold.
+    func testAFailedSaveIsPutBack() throws {
+        let m = AppModel(); m.settings.fetchIcons = false; m.icons.enabled = false
+        m.addTab("Mine")
+        // another copy writes the file underneath
+        var other = try LibraryStore(folder: home).load()
+        try other.addTab("Theirs")
+        try LibraryStore(folder: home).save(other)
+        m.addTab("Lost?")
+        XCTAssertEqual(m.notice?.title, "The bookmarks could not be saved")
+        XCTAssertTrue(m.notice!.message.contains("another copy of Bookmark Manager"))
+        XCTAssertEqual(m.library.tabs.map(\.name), ["Bookmarks", "Mine"], "the refused change is not shown either")
+        XCTAssertEqual(m.selectedTabId, m.library.tabs[1].id)
+        XCTAssertNotNil(m.reason { try $0.setMaxDepth(0) })
+        XCTAssertNil(m.reason { try $0.setMaxDepth(3) })
+    }
+}
+
+@MainActor
+final class AppReviewTests: XCTestCase {
+    private var home: URL!
+    override func setUp() async throws {
+        home = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarkmanager-rev-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        setenv("BOOKMARKMANAGER_HOME", home.path, 1)
+    }
+    override func tearDown() async throws { unsetenv("BOOKMARKMANAGER_HOME"); try? FileManager.default.removeItem(at: home) }
+
+    func testIconFetchAsksForTheSiteRootOnly() {
+        XCTAssertEqual(IconFetcher.root(of: URL(string: "http://router.local/admin/reboot?token=SECRET#x")!)?.absoluteString, "http://router.local/")
+        XCTAssertEqual(IconFetcher.root(of: URL(string: "https://user:pw@pg.mini.ts.net:8443/browser/")!)?.absoluteString, "https://pg.mini.ts.net:8443/")
+    }
+
+    func testEditorReadsDoNotFetchAndFetchesAreQueued() {
+        let cache = IconCache(folder: home.appendingPathComponent("icons"))
+        cache.enabled = true
+        XCTAssertNil(cache.image(for: "https://g", fetch: false)); XCTAssertNil(cache.image(for: "https://github.co", fetch: false))
+        XCTAssertEqual(cache.pending, 0, "a half-typed address is never looked up")
+        for i in 0..<50 { _ = cache.image(for: "https://host\(i).invalid/") }
+        XCTAssertEqual(cache.pending, 50)
+        XCTAssertLessThanOrEqual(cache.pending - 46, 4, "at most four in flight")
+        cache.enabled = false
+        _ = cache.image(for: "https://another.invalid/")
+        XCTAssertEqual(cache.pending, 50, "fetching off: nothing new is queued")
+    }
+
+    func testDroppingADirectoryOnItselfIsSilent() throws {
+        let m = AppModel(); m.settings.fetchIcons = false; m.icons.enabled = false
+        let tab = m.library.tabs[0].id
+        m.addFolder(name: "A", description: "", colorId: nil, in: FolderPath(tab: tab))
+        let a = try XCTUnwrap(m.currentTab?.folders.first)
+        XCTAssertFalse(m.drop(DragItem.folder(a.id).token, to: FolderPath([tab, a.id])))
+        XCTAssertNil(m.notice)
+    }
+
+    func testBrowserListLeavesOutTerminals() {
+        for b in Browsers.installed() {
+            XCTAssertFalse(b.id.contains("iterm"), b.id)
+            XCTAssertTrue(Browsers.known.contains(b.id) || Browsers.declares(Bundle(url: b.url)!, scheme: "file"), b.id)
+        }
     }
 }

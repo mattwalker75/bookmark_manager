@@ -78,13 +78,20 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
         return out
     }
 
-    /// The address as a URL, with https:// put in front when no scheme was typed. nil = can't be opened.
+    /// The address as a URL, with https:// put in front when no scheme was typed and spaces written as %20.
+    /// nil = can't be opened (or must not be: javascript:, data: and the like are not addresses).
     public var link: URL? { Bookmark.link(from: url) }
     public static func link(from text: String) -> URL? {
-        let s = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !s.isEmpty, !s.contains(" ") else { return nil }
-        let withScheme = s.contains("://") || s.hasPrefix("mailto:") ? s : "https://" + s
-        guard let u = URL(string: withScheme), let scheme = u.scheme, !scheme.isEmpty else { return nil }
+        var s = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty else { return nil }
+        let lower = s.lowercased()
+        for bad in ["javascript:", "data:", "vbscript:", "blob:"] where lower.hasPrefix(bad) { return nil }
+        if !s.contains("://"), !lower.hasPrefix("mailto:"), !lower.hasPrefix("tel:") {
+            guard !s.contains(" ") else { return nil }   // "two words" is not an address; a space INSIDE a real one is encoded below
+            s = "https://" + s
+        }
+        s = s.replacingOccurrences(of: " ", with: "%20")
+        guard let u = URL(string: s), let scheme = u.scheme, !scheme.isEmpty else { return nil }
         if scheme == "http" || scheme == "https" { guard let h = u.host, !h.isEmpty else { return nil } }
         return u
     }
@@ -397,20 +404,29 @@ public struct Library: Codable, Equatable, Sendable {
 
     // MARK: checks
 
+    /// Blanks and the invisible characters that look like a name but aren't (zero-width space, the Hangul filler…).
+    static let blank: CharacterSet = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}\u{3164}\u{115F}\u{1160}\u{00AD}"))
+
     static func cleanName(_ name: String, what: String) throws -> String {
-        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let n = name.trimmingCharacters(in: blank)
         guard !n.isEmpty else { throw BMError("The \(what) needs a name.") }
         return n
     }
 
     static func cleaned(_ b: Bookmark) throws -> Bookmark {
         var c = b
-        c.name = b.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        c.name = b.name.trimmingCharacters(in: blank)
         c.url = b.url.trimmingCharacters(in: .whitespacesAndNewlines)
         c.description = b.description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !c.name.isEmpty else { throw BMError("The bookmark needs a name.") }
         guard !c.url.isEmpty else { throw BMError("The bookmark needs an address.") }
-        guard Bookmark.link(from: c.url) != nil else { throw BMError("“\(c.url)” doesn't look like an address that can be opened. It should look like https://example.com/page.") }
+        guard Bookmark.link(from: c.url) != nil else {
+            let l = c.url.lowercased()
+            if l.hasPrefix("javascript:") || l.hasPrefix("data:") || l.hasPrefix("vbscript:") || l.hasPrefix("blob:") {
+                throw BMError("“\(c.url)” isn't an address a browser should open from a bookmark. It should look like https://example.com/page.")
+            }
+            throw BMError("“\(c.url)” doesn't look like an address that can be opened. It should look like https://example.com/page.")
+        }
         if !c.hasSecret { c.secret = "" }
         return c
     }
