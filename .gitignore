@@ -1,0 +1,18 @@
+# Build output
+.build/
+build/
+*.xcodeproj
+*.xcworkspace
+.swiftpm/
+DerivedData/
+
+# Your bookmarks, secrets and site icons never live in the repo; the app keeps them in
+# ~/Library/Application Support/Bookmark Manager/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+*~
+
+# a half-finished icon build
+icon/BookmarkManager.iconset/

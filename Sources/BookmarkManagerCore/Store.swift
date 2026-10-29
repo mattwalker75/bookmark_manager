@@ -1,0 +1,103 @@
+// Where Bookmark Manager keeps things: ~/Library/Application Support/Bookmark Manager/
+//   library.json   every tab, directory and bookmark, and the color codes (secrets left out)
+//   secrets.enc    the bookmarks' secrets, encrypted (SecretBox)
+//   secret.key     the key that file is encrypted with (readable by you only)
+//   settings.json  the app's own settings (the browser, the look)
+//   icons/         the site icons it fetched, one per site
+// BOOKMARKMANAGER_HOME in the environment points all of it somewhere else (tests, trying things out).
+import Foundation
+
+public enum Home {
+    public static func folder() -> URL {
+        let dir: URL
+        if let h = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_HOME"], !h.isEmpty {
+            dir = URL(fileURLWithPath: (h as NSString).expandingTildeInPath, isDirectory: true)
+        } else {
+            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            dir = base.appendingPathComponent("Bookmark Manager", isDirectory: true)
+        }
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+}
+
+public enum JSON {
+    public static let encoder: JSONEncoder = { let e = JSONEncoder(); e.outputFormatting = [.prettyPrinted, .sortedKeys]; e.dateEncodingStrategy = .iso8601; return e }()
+    public static let decoder: JSONDecoder = { let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601; return d }()
+}
+
+public struct LibraryFile: Codable, Equatable, Sendable {
+    public var app = "Bookmark Manager"
+    public var library: Library
+    public init(library: Library) { self.library = library }
+}
+
+/// library.json and the secrets that go with it.
+public final class LibraryStore: @unchecked Sendable {
+    public let folder: URL
+    public var url: URL { folder.appendingPathComponent("library.json") }
+    public let secrets: SecretBox
+    /// a warning from the last load that did not stop it (the secrets could not be read)
+    public private(set) var problem: String?
+
+    public init(folder: URL = Home.folder()) {
+        self.folder = folder
+        secrets = SecretBox(folder: folder)
+    }
+
+    /// Renames a file to "<name>.unreadable-<date>" beside it; returns the new name.
+    @discardableResult
+    static func moveAside(_ u: URL) -> String? {
+        guard FileManager.default.fileExists(atPath: u.path) else { return nil }
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmmss"; f.locale = Locale(identifier: "en_US_POSIX")
+        let name = "\(u.lastPathComponent).unreadable-\(f.string(from: Date()))"
+        do { try FileManager.default.moveItem(at: u, to: u.deletingLastPathComponent().appendingPathComponent(name)); return name } catch { return nil }
+    }
+
+    /// Loads the library, with every secret in place. No file yet = a fresh library with one tab. A damaged
+    /// library.json is moved aside (never overwritten by the next save) and reported; unreadable secrets are moved
+    /// aside too and the library loads without them (`problem` says so).
+    public func load() throws -> Library {
+        problem = nil
+        guard FileManager.default.fileExists(atPath: url.path) else { return Library.fresh() }
+        var lib: Library
+        do { lib = try JSON.decoder.decode(LibraryFile.self, from: Data(contentsOf: url)).library }
+        catch {
+            let aside = Self.moveAside(url)
+            throw BMError("The bookmarks file could not be read (\(error.localizedDescription)). It was kept as \(aside ?? url.lastPathComponent) in \(folder.path), so nothing is lost; Bookmark Manager starts with an empty library. Put it back once it is fixed, or import an export.")
+        }
+        if lib.tabs.isEmpty { lib.tabs = [Folder(name: "Bookmarks")] }
+        if !Library.depthRange.contains(lib.maxDepth) { lib.maxDepth = max(2, lib.deepestLevel) }
+        var values: [String: String] = [:]
+        do { values = try secrets.load() }
+        catch {
+            let a = Self.moveAside(secrets.dataURL), k = Self.moveAside(secrets.keyURL)
+            problem = "\((error as? BMError)?.message ?? error.localizedDescription) The old files were kept as \([a, k].compactMap { $0 }.joined(separator: " and ")). Your bookmarks loaded without their secrets: type them again in each bookmark's editor."
+        }
+        for t in lib.tabs.indices { LibraryStore.fill(&lib.tabs[t], values) }
+        return lib
+    }
+    private static func fill(_ f: inout Folder, _ values: [String: String]) {
+        for i in f.bookmarks.indices where f.bookmarks[i].hasSecret { f.bookmarks[i].secret = values[f.bookmarks[i].id.uuidString] ?? "" }
+        for i in f.folders.indices { fill(&f.folders[i], values) }
+    }
+
+    /// Saves the library; the secrets go to the encrypted file, never into library.json.
+    public func save(_ lib: Library) throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var plain = lib
+        var values: [String: String] = [:]
+        for t in plain.tabs.indices { LibraryStore.strip(&plain.tabs[t], into: &values) }
+        // the secrets first: a crash between the two writes must never leave library.json pointing at secrets that are gone
+        try secrets.save(values)
+        try JSON.encoder.encode(LibraryFile(library: plain)).write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+    private static func strip(_ f: inout Folder, into values: inout [String: String]) {
+        for i in f.bookmarks.indices {
+            if f.bookmarks[i].hasSecret { values[f.bookmarks[i].id.uuidString] = f.bookmarks[i].secret }
+            f.bookmarks[i].secret = ""
+        }
+        for i in f.folders.indices { strip(&f.folders[i], into: &values) }
+    }
+}
