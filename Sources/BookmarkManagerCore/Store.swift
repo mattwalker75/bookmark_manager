@@ -64,10 +64,22 @@ public final class LibraryStore: @unchecked Sendable {
         do { lib = try JSON.decoder.decode(LibraryFile.self, from: Data(contentsOf: url)).library }
         catch {
             let aside = Self.moveAside(url)
-            throw BMError("The bookmarks file could not be read (\(error.localizedDescription)). It was kept as \(aside ?? url.lastPathComponent) in \(folder.path), so nothing is lost; Bookmark Manager starts with an empty library. Put it back once it is fixed, or import an export.")
+            // the secrets go with it: the next save would prune secrets.enc down to the (empty) new library's needs,
+            // and the moved-aside library is worthless without them (found in review)
+            var kept = "It was kept as \(aside ?? url.lastPathComponent)"
+            if let a = aside, let suffix = a.split(separator: ".").last, FileManager.default.fileExists(atPath: secrets.dataURL.path) {
+                let copy = "secrets.enc.\(suffix)"
+                if (try? FileManager.default.copyItem(at: secrets.dataURL, to: folder.appendingPathComponent(copy))) != nil { kept += " (and its secrets as \(copy))" }
+            }
+            let reason = error.localizedDescription.hasSuffix(".") ? String(error.localizedDescription.dropLast()) : error.localizedDescription
+            throw BMError("The bookmarks file could not be read: \(reason). \(kept) in \(folder.path), so nothing is lost; Bookmark Manager starts with an empty library. Put the files back (renamed to library.json and secrets.enc) once they are fixed, or import an export.")
         }
         if lib.tabs.isEmpty { lib.tabs = [Folder(name: "Bookmarks")] }
-        if !Library.depthRange.contains(lib.maxDepth) { lib.maxDepth = max(2, lib.deepestLevel) }
+        // the levels setting must cover what is there, and stay in range (a hand-edited file may break both)
+        if !Library.depthRange.contains(lib.maxDepth) || lib.maxDepth < lib.deepestLevel {
+            lib.maxDepth = min(Library.depthRange.upperBound, max(2, lib.deepestLevel))
+        }
+        lib.repairRepeatedIds()
         var values: [String: String] = [:]
         do { values = try secrets.load() }
         catch {
@@ -88,10 +100,14 @@ public final class LibraryStore: @unchecked Sendable {
         var plain = lib
         var values: [String: String] = [:]
         for t in plain.tabs.indices { LibraryStore.strip(&plain.tabs[t], into: &values) }
-        // the secrets first: a crash between the two writes must never leave library.json pointing at secrets that are gone
-        try secrets.save(values)
+        // two steps, so a failure in between loses nothing (review): first the secrets the NEW library needs are added
+        // to the ones already there (nothing the on-disk library still points at disappears yet), then library.json,
+        // and only once that is in place are secrets that nothing needs any more pruned
+        let old = FileManager.default.fileExists(atPath: secrets.dataURL.path) ? ((try? secrets.load()) ?? [:]) : [:]
+        try secrets.save(old.merging(values) { _, new in new })
         try JSON.encoder.encode(LibraryFile(library: plain)).write(to: url, options: .atomic)
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        if Set(old.keys) != Set(values.keys) { try secrets.save(values) }
     }
     private static func strip(_ f: inout Folder, into values: inout [String: String]) {
         for i in f.bookmarks.indices {

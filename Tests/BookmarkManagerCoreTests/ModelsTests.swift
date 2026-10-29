@@ -137,6 +137,6 @@ final class ModelsTests: XCTestCase {
     func testLevelNames() {
         XCTAssertEqual(Library.levelName(1), "directory")
         XCTAssertEqual(Library.levelName(2), "sub-directory")
-        XCTAssertEqual(Library.levelName(3), "sub-sub-directory")
+        XCTAssertEqual(Library.levelName(3), "level-3 directory")
     }
 }

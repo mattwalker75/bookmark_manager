@@ -28,6 +28,7 @@ extension Library {
         switch item {
         case .bookmark(let id):
             guard let from = location(ofBookmark: id), let b = bookmark(id) else { throw BMError("That bookmark is gone.") }
+            if from == dest && before == nil { return }   // dropped where it already is: stays put (not sent to the end)
             modify(at: from) { $0.bookmarks.removeAll { $0.id == id } }
             modify(at: dest) { f in
                 if let before, let i = f.bookmarks.firstIndex(where: { $0.id == before }) { f.bookmarks.insert(b, at: i) } else { f.bookmarks.append(b) }
@@ -36,6 +37,7 @@ extension Library {
             guard let p = path(toFolder: id), let f = folder(at: p) else { throw BMError("That directory is gone.") }
             guard !p.isTabRoot else { throw BMError("A tab can't go inside a directory. Drag tabs along the tab bar to reorder them.") }
             guard !dest.isInside(p) else { throw BMError("“\(f.name)” can't be moved into itself.") }
+            if dest == p.parent! && before == nil { return }
             let level = dest.depth + 1 + f.levelsBelow
             guard level <= maxDepth else {
                 throw BMError(f.levelsBelow == 0

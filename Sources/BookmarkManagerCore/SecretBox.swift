@@ -18,7 +18,7 @@ public final class SecretBox: @unchecked Sendable {
     func key(create: Bool) throws -> SymmetricKey? {
         if let d = try? Data(contentsOf: keyURL), d.count == 32 { return SymmetricKey(data: d) }
         if FileManager.default.fileExists(atPath: keyURL.path) {
-            throw BMError("The secrets key \(keyURL.path) is damaged, so the secrets can't be read. Move it and secrets.enc aside and type the secrets again.")
+            throw BMError("The secrets key \(keyURL.path) is damaged, so the secrets can't be read.")
         }
         guard create else { return nil }
         let k = SymmetricKey(size: .bits256)
@@ -34,13 +34,13 @@ public final class SecretBox: @unchecked Sendable {
     public func load() throws -> [String: String] {
         guard FileManager.default.fileExists(atPath: dataURL.path) else { return [:] }
         guard let k = try key(create: false) else {
-            throw BMError("The secrets (\(dataURL.path)) can't be read: their key, secret.key, is missing. Move secrets.enc aside and type the secrets again.")
+            throw BMError("The secrets (\(dataURL.path)) can't be read: their key, secret.key, is missing.")
         }
         do {
             let box = try AES.GCM.SealedBox(combined: Data(contentsOf: dataURL))
             return try JSONDecoder().decode([String: String].self, from: AES.GCM.open(box, using: k))
         } catch {
-            throw BMError("The secrets (\(dataURL.path)) can't be read with this key. Move secrets.enc and secret.key aside and type the secrets again.")
+            throw BMError("The secrets (\(dataURL.path)) can't be read with this key.")
         }
     }
 

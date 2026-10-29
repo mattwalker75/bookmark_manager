@@ -117,7 +117,7 @@ final class TransferTests: XCTestCase {
         let (lib, notes) = Transfer.apply(file, to: Library.fresh(), mode: .addTabs)
         XCTAssertEqual(lib.maxDepth, 3)
         XCTAssertEqual(lib.tabs.count, 3)
-        XCTAssertTrue(notes.contains("Directory levels was raised to 3 to fit the file's directories."))
+        XCTAssertTrue(notes.contains("The directory levels were raised to 3 to fit the file's directories."))
         XCTAssertTrue(notes.contains("3 bookmarks need their secrets typed again (the file left them out)."))
     }
 

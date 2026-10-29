@@ -28,10 +28,13 @@ public struct SearchHit: Identifiable, Equatable, Sendable {
 }
 
 extension Library {
-    /// The words of a query, lowercased; an empty list means "no search".
+    /// The words of a query, folded (no case, no accents); an empty list means "no search".
     public static func words(_ query: String) -> [String] {
-        query.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        fold(query).split(whereSeparator: { $0.isWhitespace }).map(String.init)
     }
+
+    /// Text as the search compares it: case and accents don't matter ("İstanbul" is found by "istanbul", "café" by "cafe").
+    static func fold(_ s: String) -> String { s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
 
     /// Every bookmark and directory, in every tab, that matches all the words (names, addresses, tags; directory names).
     public func search(_ query: String) -> [SearchHit] {
@@ -45,7 +48,8 @@ extension Library {
     private static func search(_ words: [String], in f: Folder, path: FolderPath, names: [String], into hits: inout [SearchHit]) {
         for sub in f.folders {
             let subPath = path.appending(sub.id), subNames = names + [sub.name]
-            if words.allSatisfy({ sub.name.lowercased().contains($0) }) {
+            let folded = fold(sub.name)
+            if words.allSatisfy({ folded.contains($0) }) {
                 hits.append(SearchHit(id: sub.id, kind: .folder(sub), path: subPath, names: subNames, matched: ["name"]))
             }
             search(words, in: sub, path: subPath, names: subNames, into: &hits)
@@ -57,8 +61,8 @@ extension Library {
 
     /// The fields that matched, or nil when some word matched nothing.
     static func match(_ words: [String], _ b: Bookmark) -> [String]? {
-        let name = b.name.lowercased(), url = b.url.lowercased()
-        let tags = b.tags.map { ($0, $0.lowercased()) }
+        let name = fold(b.name), url = fold(b.url)
+        let tags = b.tags.map { ($0, fold($0)) }
         var fields: [String] = []
         for w in words {
             var found = false

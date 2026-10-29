@@ -17,8 +17,9 @@ public struct ExportFile: Codable, Equatable, Sendable {
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         app = try c.decodeIfPresent(String.self, forKey: .app) ?? ""
-        version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        exportedAt = try c.decodeIfPresent(Date.self, forKey: .exportedAt) ?? Date()
+        version = (try? c.decode(Int.self, forKey: .version)) ?? Int((try? c.decode(String.self, forKey: .version)) ?? "") ?? 1
+        // the date is information only: any odd form (a plain date, fractional seconds) must not refuse the file
+        exportedAt = (try? c.decode(Date.self, forKey: .exportedAt)) ?? Date()
         secretsIncluded = try c.decodeIfPresent(Bool.self, forKey: .secretsIncluded) ?? false
         library = try c.decode(Library.self, forKey: .library)
     }
@@ -70,9 +71,19 @@ public enum Transfer {
 
     /// The file as an export; a plain reason when it isn't one.
     public static func read(_ data: Data) throws -> ExportFile {
-        guard let f = try? JSON.decoder.decode(ExportFile.self, from: data) else {
+        let f: ExportFile
+        do { f = try JSON.decoder.decode(ExportFile.self, from: data) }
+        catch let e as DecodingError {
             if (try? JSONSerialization.jsonObject(with: data)) == nil { throw BMError("That file isn't JSON (or it is damaged), so it can't be a Bookmark Manager export.") }
-            throw BMError("That file isn't a Bookmark Manager export.")
+            // say WHERE the file goes wrong (a tags list written as one string, a number as text…)
+            let path: [CodingKey]
+            switch e {
+            case .typeMismatch(_, let c), .valueNotFound(_, let c), .keyNotFound(_, let c), .dataCorrupted(let c): path = c.codingPath
+            @unknown default: path = []
+            }
+            let place = path.map { $0.intValue.map { "item \($0 + 1)" } ?? $0.stringValue }.joined(separator: " › ")
+            if place.isEmpty || !place.hasPrefix("library") { throw BMError("That file isn't a Bookmark Manager export.") }
+            throw BMError("In the file, “\(place)” isn't in the form Bookmark Manager expects, so the file can't be read.")
         }
         guard f.app == "Bookmark Manager" else { throw BMError("That file isn't a Bookmark Manager export (it says it is from “\(f.app)”).") }
         guard f.version <= 1 else { throw BMError("That file was made by a newer Bookmark Manager. Update this one first.") }
@@ -89,7 +100,7 @@ public enum Transfer {
         r.tabs = lib.tabs.count
         if lib.tabs.isEmpty { r.problems.append(Problem(place: "The file", text: "It has no tabs. A library always has at least one tab.", stops: true)) }
         if !Library.depthRange.contains(lib.maxDepth) {
-            r.problems.append(Problem(place: "The file", text: "Directory levels is \(lib.maxDepth); it must be between \(Library.depthRange.lowerBound) and \(Library.depthRange.upperBound).", stops: true))
+            r.problems.append(Problem(place: "The file", text: "The directory levels are set to \(lib.maxDepth); they must be between \(Library.depthRange.lowerBound) and \(Library.depthRange.upperBound).", stops: true))
         }
         if lib.colors.count > ColorCode.maximum {
             r.problems.append(Problem(place: "Color codes", text: "There are \(lib.colors.count) color codes; at most \(ColorCode.maximum) are allowed.", stops: true))
@@ -154,6 +165,7 @@ public enum Transfer {
             lib = file.library
             lib.version = Library.currentVersion
             if !file.secretsIncluded {
+                for t in lib.tabs.indices { blankAll(&lib.tabs[t]) }   // the file says it holds none: trust the flag, not stray text
                 let local = Dictionary(current.allBookmarks.filter(\.hasSecret).map { ($0.id, $0.secret) }, uniquingKeysWith: { a, _ in a })
                 var kept = 0, missing = 0
                 for t in lib.tabs.indices { restoreSecrets(&lib.tabs[t], local, kept: &kept, missing: &missing) }
@@ -170,7 +182,7 @@ public enum Transfer {
             if dropped > 0 { notes.append("\(dropped) color code\(dropped == 1 ? "" : "s") from the file \(dropped == 1 ? "was" : "were") left out: there is room for \(ColorCode.maximum) at most.") }
             if file.library.deepestLevel > lib.maxDepth {
                 lib.maxDepth = min(Library.depthRange.upperBound, file.library.deepestLevel)
-                notes.append("Directory levels was raised to \(lib.maxDepth) to fit the file's directories.")
+                notes.append("The directory levels were raised to \(lib.maxDepth) to fit the file's directories.")
             }
             var blank = 0
             for t in file.library.tabs {
@@ -186,6 +198,8 @@ public enum Transfer {
         let known = Set(lib.colors.map(\.id))
         for t in lib.tabs.indices { tidy(&lib.tabs[t], known) }
         if lib.tabs.isEmpty { lib.tabs = [Folder(name: "Bookmarks")] }
+        let repaired = lib.repairRepeatedIds()
+        if repaired > 0 { notes.append("\(repaired) item\(repaired == 1 ? " had an id that was already used and got" : "s had ids that were already used and got") a fresh one.") }
         return (lib, notes)
     }
 

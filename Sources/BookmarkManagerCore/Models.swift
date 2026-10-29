@@ -222,15 +222,29 @@ public struct Library: Codable, Equatable, Sendable {
     }
     public func folder(_ id: UUID) -> Folder? { path(toFolder: id).flatMap { folder(at: $0) } }
 
-    /// The names along a path: the tab, then each folder.
+    /// The names along a path: the tab, then each folder. Empty when the path points nowhere.
     public func names(_ path: FolderPath) -> [String] {
         guard var f = tab(path.tabId) else { return [] }
         var out = [f.name]
         for id in path.ids.dropFirst() {
-            guard let next = f.folders.first(where: { $0.id == id }) else { break }
+            guard let next = f.folders.first(where: { $0.id == id }) else { return [] }
             out.append(next.name); f = next
         }
         return out
+    }
+
+    /// Gives a fresh id to any folder or bookmark whose id is already used (a hand-edited or badly merged file);
+    /// two things with one id would otherwise share a secret and be deleted together. Returns how many were changed.
+    @discardableResult
+    public mutating func repairRepeatedIds() -> Int {
+        var seen = Set<UUID>(), fixed = 0
+        for t in tabs.indices { Library.repair(&tabs[t], &seen, &fixed) }
+        return fixed
+    }
+    private static func repair(_ f: inout Folder, _ seen: inout Set<UUID>, _ fixed: inout Int) {
+        if !seen.insert(f.id).inserted { f.id = UUID(); seen.insert(f.id); fixed += 1 }
+        for i in f.bookmarks.indices where !seen.insert(f.bookmarks[i].id).inserted { f.bookmarks[i].id = UUID(); seen.insert(f.bookmarks[i].id); fixed += 1 }
+        for i in f.folders.indices { repair(&f.folders[i], &seen, &fixed) }
     }
 
     public var allBookmarks: [Bookmark] { tabs.flatMap(\.allBookmarks) }
@@ -301,6 +315,7 @@ public struct Library: Codable, Equatable, Sendable {
     public mutating func addBookmark(_ b: Bookmark, in path: FolderPath, before: UUID? = nil) throws {
         let clean = try Library.cleaned(b)
         guard folder(at: path) != nil else { throw BMError("The directory it was going into is gone.") }
+        guard location(ofBookmark: b.id) == nil else { throw BMError("That bookmark is already in the library.") }
         modify(at: path) { f in
             if let before, let i = f.bookmarks.firstIndex(where: { $0.id == before }) { f.bookmarks.insert(clean, at: i) } else { f.bookmarks.append(clean) }
         }
@@ -335,9 +350,20 @@ public struct Library: Codable, Equatable, Sendable {
     @discardableResult
     public mutating func addColor(name: String, rgb: RGB) throws -> UUID {
         guard colors.count < ColorCode.maximum else { throw BMError("There can be at most \(ColorCode.maximum) color codes. Remove one to add another.") }
-        let c = ColorCode(name: name.trimmingCharacters(in: .whitespaces), rgb: rgb)
+        let c = ColorCode(name: try Library.cleanName(name, what: "color code"), rgb: rgb)
         colors.append(c)
         return c.id
+    }
+
+    public mutating func renameColor(_ id: UUID, _ name: String) throws {
+        let n = try Library.cleanName(name, what: "color code")
+        guard let i = colors.firstIndex(where: { $0.id == id }) else { throw BMError("That color code is gone.") }
+        colors[i].name = n
+    }
+
+    public mutating func recolor(_ id: UUID, _ rgb: RGB) {
+        guard let i = colors.firstIndex(where: { $0.id == id }) else { return }
+        colors[i].rgb = rgb
     }
 
     /// Removes a color code and clears it from every bookmark and folder that used it.
@@ -391,15 +417,15 @@ public struct Library: Codable, Equatable, Sendable {
 
     static func checkEmpty(_ f: Folder, what: String) throws {
         guard !f.isEmpty else { return }
-        let b = f.bookmarkCount, d = f.allFolders.count
+        let b = f.bookmarkCount, d = f.folders.count
         var parts: [String] = []
         if b > 0 { parts.append("\(b) bookmark\(b == 1 ? "" : "s")") }
         if d > 0 { parts.append("\(d) director\(d == 1 ? "y" : "ies")") }
         throw BMError("“\(f.name)” still has \(parts.joined(separator: " and ")) in it. A \(what) can only be deleted once it is empty — move or delete what is inside first.")
     }
 
-    /// "directory" for level 1, "sub-directory" for 2, "sub-sub-directory" after that.
+    /// "directory" for level 1, "sub-directory" for 2, "level-3 directory" after that.
     public static func levelName(_ level: Int) -> String {
-        switch level { case ...0: return "tab"; case 1: return "directory"; case 2: return "sub-directory"; default: return "sub-sub-directory" }
+        switch level { case ...0: return "tab"; case 1: return "directory"; case 2: return "sub-directory"; default: return "level-\(level) directory" }
     }
 }
