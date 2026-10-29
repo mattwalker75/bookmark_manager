@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+#
+# INSTALL_APP.sh — set up Bookmark Manager on this Mac.
+#
+# What it needs:
+#   REQUIRED  macOS 14 or newer, on an Apple-silicon or Intel Mac.
+#   REQUIRED  Xcode's command-line tools (the Swift compiler) — this script offers to install them.
+#
+# Usage:  ./INSTALL_APP.sh [options…]
+#
+#   (no options)    Check the tools, run the tests, build "Bookmark Manager.app" (BUILD_APP.sh) and
+#                   MOVE it to /Applications (asking first) — build/ is left without it.
+#   -t, --to DIR    Put the finished app in DIR instead of /Applications — for example
+#                   ./INSTALL_APP.sh --to ~/Desktop   (DIR must already exist).
+#   -u, --universal Build one app that runs on Apple-silicon and Intel Macs (for copying to another Mac).
+#   -s, --sign ID   Sign with a certificate from your Keychain, so the app keeps one identity across
+#                   rebuilds (see Docs/SCRIPTS.md). Or set BOOKMARKMANAGER_SIGN_IDENTITY.
+#   -k, --skip-tests  Don't run the tests first (quicker when you just pulled new code).
+#   -p, --copy      Copy the app instead of moving it, so build/Bookmark Manager.app stays too.
+#   -n, --no-copy   Build only; leave the app in build/ and don't touch /Applications.
+#   -y, --yes       Don't ask before installing tools, installing on a failed test run, or replacing
+#                   an app that is already there.
+#   -c, --check     Only report what is installed or missing; change nothing.
+#   -h, --help      This help.
+#
+# Safe to run again at any time — for example after pulling new code (it rebuilds and replaces the app).
+# Your bookmarks are not in the app: they stay in ~/Library/Application Support/Bookmark Manager/.
+# Then open Bookmark Manager from /Applications.
+#
+set -uo pipefail
+ORIG_PWD="$PWD"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; cd "$HERE"
+if [[ -t 1 ]]; then C_RESET=$'\033[0m'; C_RED=$'\033[0;31m'; C_GRN=$'\033[0;32m'; C_YEL=$'\033[0;33m'; C_BLU=$'\033[0;34m'; else C_RESET=''; C_RED=''; C_GRN=''; C_YEL=''; C_BLU=''; fi
+info() { echo "${C_BLU}==>${C_RESET} $*"; }; ok() { echo "${C_GRN}OK ${C_RESET} $*"; }; warn() { echo "${C_YEL}!! ${C_RESET} $*"; }; err() { echo "${C_RED}ERROR${C_RESET} $*" >&2; }
+usage() { awk 'NR>=3 { if (/^#/) { sub(/^# ?/, ""); print } else { exit } }' "${BASH_SOURCE[0]}"; }
+
+MIN_MACOS=14
+APP_NAME="Bookmark Manager"
+BUNDLE_ID="com.mattwalker.bookmarkmanager"
+COPY=1; KEEP_BUILD=0; YES=0; CHECK_ONLY=0; SKIP_TESTS=0; DEST="/Applications"; BUILD_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -t|--to)        [[ $# -ge 2 ]] || { err "--to needs a folder, for example --to ~/Desktop"; exit 2; }; DEST="${2/#\~/$HOME}"; shift ;;
+    -u|--universal) BUILD_ARGS+=(--universal) ;;
+    -s|--sign)      [[ $# -ge 2 ]] || { err "--sign needs the name of a certificate in your Keychain"; exit 2; }; BUILD_ARGS+=(--sign "$2"); shift ;;
+    -k|--skip-tests) SKIP_TESTS=1 ;;
+    -p|--copy)      KEEP_BUILD=1 ;;
+    -n|--no-copy)   COPY=0 ;;
+    -y|--yes)       YES=1 ;;
+    -c|--check)     CHECK_ONLY=1 ;;
+    -h|--help)      usage; exit 0 ;;
+    *) err "Unknown option: $1"; echo; usage; exit 2 ;;
+  esac; shift
+done
+confirm() { [[ $YES -eq 1 ]] && return 0; read -r -p "$1 [y/N] " a; [[ "$a" == y || "$a" == Y ]]; }
+if [[ $COPY -eq 1 || $CHECK_ONLY -eq 1 ]]; then
+  [[ "$DEST" = /* ]] || DEST="$ORIG_PWD/$DEST"   # a relative --to is relative to where the script was run from
+  resolved="$(cd "$DEST" 2>/dev/null && pwd)" || { err "The folder $DEST doesn't exist. Make it first, or pick another with --to."; exit 2; }
+  DEST="$resolved"
+  if [[ "$DEST" == "$HERE/build" ]]; then err "--to can't be the build folder itself (that is where the app is built). Pick another folder."; exit 2; fi
+fi
+TARGET="$DEST/$APP_NAME.app"
+
+echo "$APP_NAME — install"; echo
+# ---- macOS version
+major="$(sw_vers -productVersion | cut -d. -f1)"
+if [[ "$major" -ge $MIN_MACOS ]]; then ok "macOS $(sw_vers -productVersion)"; else err "$APP_NAME needs macOS $MIN_MACOS or newer (this Mac has $(sw_vers -productVersion))."; exit 1; fi
+# ---- the Swift compiler
+if xcode-select -p >/dev/null 2>&1 && command -v swift >/dev/null 2>&1 && swift --version >/dev/null 2>&1; then
+  ok "Swift $(swift --version 2>/dev/null | head -1 | sed -n 's/.*Swift version \([0-9.]*\).*/\1/p')"
+else
+  warn "Xcode's command-line tools (the Swift compiler) are not installed"
+  if [[ $CHECK_ONLY -eq 0 ]] && confirm "Install them now? (macOS opens its own installer; run this script again when it finishes)"; then
+    xcode-select --install 2>/dev/null || true
+    echo "When the installer finishes, run ./INSTALL_APP.sh again."
+  fi
+  # --check still reports on the app (it needs no compiler to look at it)
+  [[ $CHECK_ONLY -eq 1 ]] || exit 1
+fi
+if [[ $CHECK_ONLY -eq 1 ]]; then
+  [[ -d "build/$APP_NAME.app" ]] && ok "App built (build/$APP_NAME.app)" || warn "App not built yet"
+  if [[ -d "$TARGET" ]]; then
+    ok "App in $DEST"
+    arch="$(lipo -archs "$TARGET/Contents/MacOS/$APP_NAME" 2>/dev/null || echo '?')"
+    sig="$(codesign -dv "$TARGET" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+    echo "    built for: ${arch} · signed: ${sig:-ad hoc}"
+  else
+    warn "App not in $DEST"
+  fi
+  exit 0
+fi
+# ---- tests
+mkdir -p build
+if [[ $SKIP_TESTS -eq 1 ]]; then
+  info "Skipping the tests (--skip-tests)"
+else
+  info "Running the tests (under a minute)…"
+  if swift test > build/test.log 2>&1; then
+    # two test bundles (the core, the app): add up the "All tests" totals of each
+    total="$(grep -A1 "Test Suite 'All tests' passed" build/test.log | sed -nE 's/.*Executed ([0-9]+) tests.*/\1/p' | awk '{s+=$1} END {print s+0}')"
+    ok "Tests pass ($total tests)"
+  else
+    warn "Some tests failed — see build/test.log:"
+    grep -E "error:|Fatal error" build/test.log | head -5 | sed 's/^/    /'
+    if ! confirm "Build and install anyway?"; then exit 1; fi
+  fi
+fi
+# ---- build
+./BUILD_APP.sh ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} || { err "The build failed."; exit 1; }
+# ---- install
+# the copy being replaced may be open: an open app's files can be deleted, but it keeps running the old version
+running_old() { pgrep -f "$TARGET/Contents/MacOS/$APP_NAME" >/dev/null 2>&1; }
+REOPEN=0
+if [[ $COPY -eq 1 ]]; then
+  if [[ -d "$TARGET" ]]; then
+    if confirm "Replace the $APP_NAME already in $DEST?"; then
+      if running_old; then
+        if confirm "$APP_NAME is open. Close it so the new version can be installed? (Your bookmarks are safe.)"; then
+          osascript -e "quit app id \"$BUNDLE_ID\"" >/dev/null 2>&1 || true
+          for _ in $(seq 1 20); do running_old || break; sleep 0.5; done
+          if running_old; then err "$APP_NAME did not close. Quit it and run this again."; exit 1; fi
+          REOPEN=1
+        else
+          warn "Leaving the open copy alone: it keeps running the old version until you quit and reopen it."
+        fi
+      fi
+    else COPY=0; fi
+  elif ! confirm "$([[ $KEEP_BUILD -eq 1 ]] && echo Copy || echo Move) $APP_NAME.app to $DEST?"; then COPY=0; fi
+fi
+if [[ $COPY -eq 1 ]]; then
+  # first beside the old one, then swapped in, so a failed move/copy never leaves you with no app (or half of one).
+  # By default the app is MOVED out of build/ (Matt's choice); --copy uses ditto (Apple's way to copy a bundle) and
+  # leaves build/Bookmark Manager.app where it is.
+  NEW="$DEST/.$APP_NAME.app.new"
+  rm -rf "$NEW"
+  if [[ $KEEP_BUILD -eq 1 ]]; then
+    ditto "build/$APP_NAME.app" "$NEW" || { rm -rf "$NEW"; err "Could not copy the app to $DEST (the old one is untouched)."; exit 1; }
+  else
+    mv "build/$APP_NAME.app" "$NEW" || { rm -rf "$NEW"; err "Could not move the app to $DEST (the old one is untouched; the new one is still in build/)."; exit 1; }
+  fi
+  if [[ -d "$TARGET" ]]; then rm -rf "$TARGET" || { rm -rf "$NEW"; err "Could not remove the old app in $DEST (is the folder read-only?)."; exit 1; }; fi
+  mv "$NEW" "$TARGET" || { err "Could not put the new app in place in $DEST."; exit 1; }
+  ok "Installed $TARGET ($([[ $KEEP_BUILD -eq 1 ]] && echo "copied; build/$APP_NAME.app stays" || echo "moved out of build/"))"
+  if [[ $REOPEN -eq 1 ]]; then open "$TARGET" && ok "Opened the new $APP_NAME"; fi
+  echo; echo "Next:  open \"$TARGET\""
+  [[ "$DEST" == "/Applications" ]] && echo "       (or find $APP_NAME in Launchpad)"
+  echo "       To use it on another Mac, copy the whole \"$APP_NAME.app\" over, or install it there the same way,"
+  echo "       then move your bookmarks with Settings → Export & import. Build with --universal if the other Mac has"
+  echo "       a different kind of chip; see Docs/SCRIPTS.md for the one-time \"Open Anyway\" step macOS asks for."
+else
+  echo; echo "Next:  open \"$HERE/build/$APP_NAME.app\""
+fi
+exit 0
