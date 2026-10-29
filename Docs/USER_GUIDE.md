@@ -14,10 +14,11 @@ hidden until you ask for it.
 - A tab can only be deleted when it is **empty** — no bookmarks, no directories — and never the last one.
 
 ## Directories and sub-directories
-- The folder tree on the left shows the open tab's directories and their sub-directories, each with its
+- The directory list on the left shows the open tab's directories and their sub-directories, each with its
   description (if it has one) and how many bookmarks sit directly in it. Click one to open it on the right.
-- **New directory** (bottom of the tree, the button at the top of a directory's page, ⇧⌘N, or right-click → New
-  directory inside…) makes one inside the open directory. Give it a name, an optional description, a color.
+- **New directory** (bottom of the directory list, the button at the top of a directory's page, ⇧⌘N, or
+  right-click → New directory inside…) makes one inside the open directory — or beside it, when the levels don't
+  allow one deeper. Give it a name, an optional description, a color.
 - Directories may go **two levels deep** by default (a directory with a sub-directory in it). Settings → General
   changes that (1 to 6). It can't be lowered while a deeper directory exists.
 - **Edit…** (the button on its page, or right-click) changes the name, description and color.
@@ -25,8 +26,8 @@ hidden until you ask for it.
   happens — move or delete what is inside first. That is on purpose, so a full directory never goes by accident.
 
 ## Bookmarks
-- **New bookmark** (the + in the title bar, the button on a directory's page, ⌘N, or right-click a directory →
-  New bookmark here…) adds one to the open directory (or the tab's top level).
+- **New bookmark** (the + in the title bar, the button on a directory's page, or ⌘N) adds one to the open
+  directory (or the tab's top level); right-click a directory → **New bookmark here…** adds one to that directory.
 - A bookmark has:
   - **Name** — what the row shows. Click it to open the address in your browser.
   - **Description** — optional, a sentence or two, shown in smaller text under the name.
@@ -49,7 +50,7 @@ hidden until you ask for it.
 ## Arranging
 - Bookmarks and directories stay in the order you put them. **Sort by name** on a directory's page sorts that
   directory's sub-directories and bookmarks once; after that the order is yours again.
-- **Drag** a row (a bookmark or a sub-directory) onto a directory in the tree, onto a sub-directory row, or onto a
+- **Drag** a row (a bookmark or a sub-directory) onto a directory in the list on the left, onto a sub-directory row, or onto a
   tab to move it there. Drop a bookmark on another bookmark to put it just before that one; drop it in the space
   under the last row to put it at the end. A directory dropped on a bookmark goes into that bookmark's directory.
 - **Move to…** (right-click, or *In* in the bookmark's editor) does the same from a list of every place.
@@ -64,8 +65,8 @@ hidden until you ask for it.
 
 ## Color codes
 - Settings → **Color codes**: each color has a name — *Important*, *Work*, *Personal*, *Reference* to start.
-  Change a color (click the swatch) or its name, add more (up to 10), remove one. Removing a color that is in
-  use asks first, then clears it from those bookmarks and directories.
+  Change a color (click the swatch) or its name, add more (up to 10), remove one. Removing a color asks first and
+  says how many bookmarks and directories lose it, then clears it from them.
 - On the rows only the tint shows; the name appears in the editor's color pills and in Settings.
 
 ## Settings
@@ -93,4 +94,5 @@ hidden until you ask for it.
 ## Where things are kept
 `~/Library/Application Support/Bookmark Manager/` — `library.json` (the bookmarks, no secrets), `secrets.enc`
 and `secret.key` (the secrets, encrypted; the key is readable by you only), `settings.json`, `icons/`. A damaged
-file is moved aside with the date in its name, never overwritten.
+bookmarks or secrets file is moved aside with the date in its name (the secrets are kept beside a damaged
+bookmarks file), never overwritten; a damaged settings file is ignored and replaced.

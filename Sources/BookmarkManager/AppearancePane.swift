@@ -1,4 +1,4 @@
-// Settings → Appearance: the look, the accent colour, and the user's own named themes with a live preview.
+// Settings → Appearance: the look, the accent color, and the user's own named themes with a live preview.
 import SwiftUI
 import BookmarkManagerCore
 
@@ -33,14 +33,14 @@ struct AppearancePane: View {
                     }
                 }
                 HStack {
-                    Text("Your own theme sets the look, the accent, the good / attention / problem colours, and tints for the folder tree and cards.")
+                    Text("Your own theme sets the look, the accent, the good / attention / problem colors, and tints for the directory list and cards.")
                         .font(DS.secondary).foregroundStyle(.secondary)
                     Spacer()
                     Button("New…") { editing = CustomTheme(name: "", look: model.settings.appearance, accent: model.settings.accent) }
                         .help("Make a theme of your own")
                 }
             }
-            Section("Accent colour") {
+            Section("Accent color") {
                 HStack(spacing: 10) {
                     ForEach(AccentChoice.allCases) { a in
                         Button {
@@ -59,7 +59,7 @@ struct AppearancePane: View {
                             let t = ThemeColor(c)
                             if t != model.settings.accent { model.settings.accent = t }
                         }
-                        .help("Any other colour").accessibilityLabel("A colour of your own")
+                        .help("Any other color").accessibilityLabel("A color of your own")
                 }
                 .disabled(model.settings.activeTheme != nil)
                 Text(model.settings.activeTheme != nil
@@ -96,7 +96,7 @@ struct AppearancePane: View {
     }
 
     private var accentName: String {
-        AccentChoice.allCases.first { $0.color == model.settings.accent }?.label ?? "A colour of your own"
+        AccentChoice.allCases.first { $0.color == model.settings.accent }?.label ?? "A color of your own"
     }
 
     private func delete(_ t: CustomTheme) {
@@ -105,7 +105,7 @@ struct AppearancePane: View {
     }
 }
 
-/// Make or change a theme; the window follows along as the colours change.
+/// Make or change a theme; the window follows along as the colors change.
 struct ThemeEditor: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -126,15 +126,15 @@ struct ThemeEditor: View {
             Form {
                 Field("Name", $theme.name, "Midnight")
                 Picker("Look", selection: $theme.look) { ForEach(Appearance.allCases, id: \.self) { Text($0.label).tag($0) } }
-                Section("Colours") {
+                Section("Colors") {
                     ColorPicker("Accent", selection: $accent, supportsOpacity: false)
                     ColorPicker("Good (a file that validates)", selection: $good, supportsOpacity: false)
                     ColorPicker("Attention (notes, secrets in an export)", selection: $attention, supportsOpacity: false)
                     ColorPicker("Problem (something refused)", selection: $problem, supportsOpacity: false)
                 }
                 Section("Tints") {
-                    Toggle("Tint the folder tree", isOn: $tintSidebar)
-                    if tintSidebar { ColorPicker("Folder tree tint", selection: $sidebar, supportsOpacity: false) }
+                    Toggle("Tint the directory list", isOn: $tintSidebar)
+                    if tintSidebar { ColorPicker("Directory list tint", selection: $sidebar, supportsOpacity: false) }
                     Toggle("Tint the cards", isOn: $tintCards)
                     if tintCards { ColorPicker("Card tint", selection: $cards, supportsOpacity: false) }
                 }

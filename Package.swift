@@ -11,7 +11,7 @@ let package = Package(
         .executable(name: "BookmarkManager", targets: ["BookmarkManager"]),
     ],
     targets: [
-        // The library of tabs, folders and bookmarks, the file it lives in, the secrets, search, moving things,
+        // The library of tabs, directories and bookmarks, the file it lives in, the secrets, search, moving things,
         // export / validate / import. No UI — testable on its own.
         .target(name: "BookmarkManagerCore", path: "Sources/BookmarkManagerCore"),
         // The SwiftUI app (the window, the editors, the secret window, Settings). Thin: it drives the core.

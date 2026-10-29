@@ -83,7 +83,7 @@ struct HitRow: View {
                         .onHover { nameOver = $0 }
                         .onTapGesture { open() }
                         .accessibilityAddTraits(hit.isFolder ? .isButton : .isLink)
-                    if hit.isFolder { Text("· directory").font(DS.secondary).foregroundStyle(.secondary) }
+                    if hit.isFolder { Text("· \(Library.levelName(hit.path.depth))").font(DS.secondary).foregroundStyle(.secondary) }
                 }
                 Text(detail).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1)
             }

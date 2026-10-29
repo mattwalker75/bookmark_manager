@@ -85,6 +85,12 @@ final class AppModel: ObservableObject {
     func color(_ id: UUID?) -> ColorCode? { library.color(id) }
     /// "Work › Self-hosted apps"
     func placeName(_ path: FolderPath) -> String { library.names(path).joined(separator: " › ") }
+    /// Where a new directory goes: inside the open one when the levels allow it, else beside it (up the path).
+    var newFolderPath: FolderPath {
+        var p = selectedPath
+        while p.depth + 1 > library.maxDepth, let parent = p.parent { p = parent }
+        return p
+    }
 
     // MARK: selection
 
@@ -205,13 +211,12 @@ final class AppModel: ObservableObject {
 
     // MARK: settings that live in the library
 
-    func setMaxDepth(_ d: Int) { change("Directory levels wasn't changed") { try $0.setMaxDepth(d) } }
+    func setMaxDepth(_ d: Int) { change("The directory levels weren't changed") { try $0.setMaxDepth(d) } }
     func addColor(name: String, rgb: RGB) { change("The color wasn't added") { _ = try $0.addColor(name: name, rgb: rgb) } }
     func updateColor(_ id: UUID, name: String? = nil, rgb: RGB? = nil) {
-        change { lib in
-            guard let i = lib.colors.firstIndex(where: { $0.id == id }) else { return }
-            if let name { lib.colors[i].name = name }
-            if let rgb { lib.colors[i].rgb = rgb }
+        change("The color wasn't changed") { lib in
+            if let name { try lib.renameColor(id, name) }
+            if let rgb { lib.recolor(id, rgb) }
         }
     }
     func removeColor(_ id: UUID) { change { $0.removeColor(id) } }

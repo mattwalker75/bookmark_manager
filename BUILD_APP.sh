@@ -49,24 +49,27 @@ done
 
 command -v swift >/dev/null 2>&1 || { err "The Swift compiler is not installed. Run ./INSTALL_APP.sh (it installs Xcode's command-line tools) and try again."; exit 1; }
 
-APP_NAME="Bookmark Manager"
 BUNDLE_ID="com.mattwalker.bookmarkmanager"
-VERSION="$(sed -n 's/.*version = "\([^"]*\)".*/\1/p' Sources/BookmarkManagerCore/Version.swift | head -1)"
+VERSION="$(sed -n 's/.*version = "\([^"]*\)".*/\1/p' Sources/BookmarkManagerCore/Version.swift)"
 [[ -n "$VERSION" ]] || VERSION="0.0.0"
 mkdir -p build
 
 ARCH_ARGS=()
 if [[ $UNIVERSAL -eq 1 ]]; then ARCH_ARGS=(--arch arm64 --arch x86_64); info "Compiling ($CONFIG, universal: Apple silicon + Intel)…"; else info "Compiling ($CONFIG)…"; fi
-# a failed compile must never let an older binary be packaged with the new version number
+APP_NAME="Bookmark Manager"
+APP="$OUT/$APP_NAME.app"
+# a failed compile must never let an older binary be packaged with the new version number — nor leave the previous
+# app in build/ looking like a fresh one
+rm -rf "$APP"
 if ! swift build -c "$CONFIG" ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"} --product BookmarkManager > build/build.log 2>&1; then
-  tail -n 40 build/build.log >&2
+  # only the compiler's own messages, trimmed: the raw log holds colour codes and command lines thousands of characters long
+  sed 's/\x1b\[[0-9;]*m//g' build/build.log | grep -E "error:|warning:" | grep -v "Failed frontend\|Command line\|nonzero exit code" | cut -c1-240 | head -n 20 >&2
   err "The build failed (the full output is in build/build.log)."
   exit 1
 fi
 BIN="$(swift build -c "$CONFIG" ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"} --product BookmarkManager --show-bin-path)/BookmarkManager"
 [[ -x "$BIN" ]] || { err "The build did not produce the program (expected $BIN)."; exit 1; }
 
-APP="$OUT/$APP_NAME.app"
 info "Assembling ${APP}…"
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"

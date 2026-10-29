@@ -22,7 +22,7 @@ struct BookmarkManagerApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Bookmark…") { model.sheet = .newBookmark(model.selectedPath) }.keyboardShortcut("n")
-                Button("New Directory…") { model.sheet = .newFolder(model.selectedPath) }.keyboardShortcut("n", modifiers: [.command, .shift])
+                Button("New Directory…") { model.sheet = .newFolder(model.newFolderPath) }.keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("New Tab…") { model.sheet = .newTab }.keyboardShortcut("t")
             }
             CommandMenu("Bookmarks") {

@@ -24,7 +24,8 @@ it is not a developer: every message is a plain sentence.
   TabNameSheet, MoveSheet, ColorPills, DestinationPicker), `SecretWindow` (one NSWindow per bookmark),
   `SettingsView` (General, Color codes, Appearance, Export & import + ValidationSheet), `Browsers`, `Icons`
   (IconCache + IconFetcher), `Sample`. The look is App Starter's / Data Syncer's: `Design.swift`, `Themes.swift`,
-  `AppearancePane.swift`, `PlainTextField.swift` are copies, `TextBox.swift` is ScriptEditor renamed — keep them in step.
+  `AppearancePane.swift`, `PlainTextField.swift` are adapted copies (Themes adds `RGB.color`, drops the bundle light;
+  AppearancePane reworded), `TextBox.swift` is ScriptEditor renamed — keep them in step.
 - `Tests/BookmarkManagerCoreTests/` — XCTest against throwaway folders (`Scratch`) and a fixed `Sample` library.
   `Tests/BookmarkManagerTests/` — AppModel on a scratch `BOOKMARKMANAGER_HOME`.
 
@@ -51,14 +52,16 @@ it is not a developer: every message is a plain sentence.
    problem with its place (`Transfer.validate`, stops vs notes) and changes nothing; Import validates first, then
    Replace everything (confirmed) or Add its tabs (fresh ids). Replace without secrets keeps local secrets by id.
 8. **Color codes:** in the library (so they export): 4 defaults, up to `ColorCode.maximum` (10), any color + name;
-   removing one clears it everywhere (asks when in use). Tags are search-only, never shown on rows.
+   removing one clears it everywhere (Remove always asks and says how many lose it). Tags are search-only, never shown on rows.
 9. **Search** covers every tab, every word must match (name, address, tags; directory names — NOT descriptions);
    results are grouped by tab with the path; "Show in place" selects the directory and flashes the row (`highlightId`).
-10. **Site icons** are fetched once per host into `<home>/icons/<host>.png` (any certificate accepted, http allowed via
+10. **Site icons** are fetched once per host into `<home>/icons/<host>.png` (`<host>_<port>.png` with a port) (any certificate accepted, http allowed via
     `NSAllowsArbitraryLoads` — on its own, see App Starter), a failure is remembered until relaunch, the link glyph
     is the fallback; Settings → General can turn fetching off. Nothing else touches the network.
 11. **Files are never lost:** a damaged library.json / unreadable secrets are moved aside (`*.unreadable-<date>`) and
-    reported. `library.json` is written after `secrets.enc`. Settings decode every field with a default.
+    reported; a damaged library.json takes a COPY of secrets.enc with it (review: the next save would prune them).
+    Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json, then the prune — a failed library
+    write loses no secret. Repeated ids are repaired on load and on import. Settings decode every field with a default.
 12. **Text fields are `PlainTextField` / `Field`**, the secret is a `TextBox` (data_syncer rule 14b). Base text 14.
 13. **Scripts:** BUILD_APP.sh / INSTALL_APP.sh like app_starter's; idempotent, plain-spoken. **Commits:** one per
     feature with a dated CHANGELOG entry; explicit `git add <paths>`; never push — Matt pushes.

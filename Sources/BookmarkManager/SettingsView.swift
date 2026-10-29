@@ -32,7 +32,7 @@ struct GeneralPane: View {
                     Text("System default" + (Browsers.defaultName().map { " (\($0))" } ?? "")).tag(String?.none)
                     ForEach(browsers) { b in Text(b.name).tag(String?.some(b.id)) }
                     if let chosen = model.settings.browser, !browsers.contains(where: { $0.id == chosen }) {
-                        Text("Not installed any more (\(chosen))").tag(String?.some(chosen))
+                        Text("Not installed any more").tag(String?.some(chosen))
                     }
                 }
                 Text("Every bookmark opens in this browser when you click its name. The list is the browsers installed on this Mac.")
@@ -178,6 +178,7 @@ struct TransferPane: View {
     @State private var messageIsProblem = false
     @State private var result: ValidationResult?
     @State private var pendingImport: ValidationResult?
+    @State private var replacePending: ValidationResult?
 
     var body: some View {
         Form {
@@ -203,11 +204,15 @@ struct TransferPane: View {
         .sheet(item: $result) { r in ValidationSheet(result: r) { mode in finish(r, mode: mode) } }
         .confirmationDialog("How should “\(pendingImport?.url.lastPathComponent ?? "")” come in?", isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } }), titleVisibility: .visible) {
             Button("Add its tabs beside mine") { if let p = pendingImport { finish(p, mode: .addTabs) }; pendingImport = nil }
-            Button("Replace everything here") { if let p = pendingImport { finish(p, mode: .replace) }; pendingImport = nil }
+            Button("Replace everything here…") { replacePending = pendingImport; pendingImport = nil }
             Button("Cancel", role: .cancel) { pendingImport = nil }.keyboardShortcut(.defaultAction)
         } message: {
             Text("\(pendingImport?.report.counts ?? "") “Add” brings its tabs in as copies and leaves yours as they are. “Replace” throws away what is here first — export a copy of yours before, if you want one.")
         }
+        .confirmationDialog("Replace everything here with “\(replacePending?.url.lastPathComponent ?? "")”?", isPresented: Binding(get: { replacePending != nil }, set: { if !$0 { replacePending = nil } }), titleVisibility: .visible) {
+            Button("Replace everything") { if let p = replacePending { finish(p, mode: .replace) }; replacePending = nil }
+            Button("Cancel", role: .cancel) { replacePending = nil }.keyboardShortcut(.defaultAction)
+        } message: { Text("Every tab, directory and bookmark here is thrown away first. This can't be undone.") }
     }
 
     private func export() {

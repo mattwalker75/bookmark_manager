@@ -20,7 +20,8 @@
 #   -n, --no-copy   Build only; leave the app in build/ and don't touch /Applications.
 #   -y, --yes       Don't ask before installing tools, installing on a failed test run, or replacing
 #                   an app that is already there.
-#   -c, --check     Only report what is installed or missing; change nothing.
+#   -c, --check     Only report what is installed or missing (and what the installed app was built
+#                   for and signed with); change nothing.
 #   -h, --help      This help.
 #
 # Safe to run again at any time — for example after pulling new code (it rebuilds and replaces the app).
@@ -52,6 +53,7 @@ while [[ $# -gt 0 ]]; do
     *) err "Unknown option: $1"; echo; usage; exit 2 ;;
   esac; shift
 done
+if [[ $KEEP_BUILD -eq 1 && $COPY -eq 0 ]]; then err "--copy and --no-copy can't both be given: one keeps a copy in build/, the other installs nothing."; exit 2; fi
 confirm() { [[ $YES -eq 1 ]] && return 0; read -r -p "$1 [y/N] " a; [[ "$a" == y || "$a" == Y ]]; }
 if [[ $COPY -eq 1 || $CHECK_ONLY -eq 1 ]]; then
   [[ "$DEST" = /* ]] || DEST="$ORIG_PWD/$DEST"   # a relative --to is relative to where the script was run from
@@ -78,7 +80,7 @@ else
   [[ $CHECK_ONLY -eq 1 ]] || exit 1
 fi
 if [[ $CHECK_ONLY -eq 1 ]]; then
-  [[ -d "build/$APP_NAME.app" ]] && ok "App built (build/$APP_NAME.app)" || warn "App not built yet"
+  [[ -d "build/$APP_NAME.app" ]] && ok "App built (build/$APP_NAME.app)" || info "No app in build/ (it is moved out when installed)"
   if [[ -d "$TARGET" ]]; then
     ok "App in $DEST"
     arch="$(lipo -archs "$TARGET/Contents/MacOS/$APP_NAME" 2>/dev/null || echo '?')"
@@ -100,8 +102,8 @@ else
     total="$(grep -A1 "Test Suite 'All tests' passed" build/test.log | sed -nE 's/.*Executed ([0-9]+) tests.*/\1/p' | awk '{s+=$1} END {print s+0}')"
     ok "Tests pass ($total tests)"
   else
-    warn "Some tests failed — see build/test.log:"
-    grep -E "error:|Fatal error" build/test.log | head -5 | sed 's/^/    /'
+    warn "The tests could not be run, or some failed — see build/test.log:"
+    sed 's/\x1b\[[0-9;]*m//g' build/test.log | grep -E "error:|Fatal error" | grep -v "Failed frontend\|Command line\|nonzero exit code" | cut -c1-240 | head -5 | sed 's/^/    /'
     if ! confirm "Build and install anyway?"; then exit 1; fi
   fi
 fi
@@ -116,6 +118,7 @@ if [[ $COPY -eq 1 ]]; then
     if confirm "Replace the $APP_NAME already in $DEST?"; then
       if running_old; then
         if confirm "$APP_NAME is open. Close it so the new version can be installed? (Your bookmarks are safe.)"; then
+          info "Closing the open $APP_NAME…"
           osascript -e "quit app id \"$BUNDLE_ID\"" >/dev/null 2>&1 || true
           for _ in $(seq 1 20); do running_old || break; sleep 0.5; done
           if running_old; then err "$APP_NAME did not close. Quit it and run this again."; exit 1; fi

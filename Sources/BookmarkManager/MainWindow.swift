@@ -219,8 +219,8 @@ struct FolderTree: View {
             }
             Divider()
             HStack(spacing: 8) {
-                Button { model.sheet = .newFolder(newFolderPath) } label: { Label("New directory", systemImage: "folder.badge.plus") }
-                    .buttonStyle(.borderless).help("A new directory inside the one that is open (⇧⌘N)")
+                Button { model.sheet = .newFolder(model.newFolderPath) } label: { Label("New directory", systemImage: "folder.badge.plus") }
+                    .buttonStyle(.borderless).help("A new directory inside the one that is open, or beside it when the levels don't allow one deeper (⇧⌘N)")
                 Spacer()
                 Button("Rename tab…") { if let t = model.currentTab { model.sheet = .renameTab(t) } }.buttonStyle(.borderless)
             }
@@ -229,12 +229,6 @@ struct FolderTree: View {
         .background(Theme.sidebarTint?.opacity(0.18) ?? Color.clear)
     }
 
-    /// New directory goes into the open folder when the levels allow it, else beside it.
-    private var newFolderPath: FolderPath {
-        var p = model.selectedPath
-        while p.depth + 1 > model.library.maxDepth, let parent = p.parent { p = parent }
-        return p
-    }
 }
 
 /// A folder and, below it, its sub-folders.
@@ -453,7 +447,7 @@ struct SubfolderRow: View {
         .onTapGesture { model.select(path) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .help("Open “\(folder.name)” · drop a bookmark here to move it in")
+        .help("Open “\(folder.name)” · drop a bookmark or directory here to move it in")
         .draggable(DragItem.folder(folder.id).token) { DragPreview(title: folder.name, icon: "folder") }
         .dropDestination(for: String.self) { items, _ in
             guard let token = items.first else { return false }

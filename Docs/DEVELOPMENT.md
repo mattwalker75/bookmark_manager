@@ -8,7 +8,8 @@ Sources/BookmarkManager/       BookmarkManagerApp (+ AppDelegate) · AppModel ·
                                Editors (BookmarkEditor, ColorPills, DestinationPicker, FolderEditor, TabNameSheet, MoveSheet)
                                SecretWindow · SettingsView (GeneralPane, ColorCodesPane, TransferPane, ValidationSheet)
                                Browsers · Icons (IconCache, IconFetcher) · Sample
-                               Design · Themes · AppearancePane · PlainTextField · TextBox   ← App Starter's, keep in step
+                               Design · Themes · AppearancePane · PlainTextField · TextBox   ← adapted from App Starter (Themes adds
+                                                              RGB.color and drops the bundle light; AppearancePane reworded; TextBox = ScriptEditor), keep in step
 Tests/BookmarkManagerCoreTests/  Models · Arrange · Search · Store · Transfer · Favicon tests · Helpers (Scratch, Sample)
 Tests/BookmarkManagerTests/      AppModelTests (on a scratch BOOKMARKMANAGER_HOME)
 icon/                          icon.svg (Tabbed folder) → make_icns.sh → BookmarkManager.icns (committed)
@@ -43,7 +44,7 @@ A host that fails is skipped until the next launch.
 `Home.folder()` = `~/Library/Application Support/Bookmark Manager/`, or `$BOOKMARKMANAGER_HOME`.
 `library.json` (`{"app":"Bookmark Manager","library":{…}}`, secrets blank) · `secrets.enc` (AES-GCM,
 `{bookmarkId: text}`) · `secret.key` (32 random bytes, 0600) · `settings.json` (appearance, accent, themes,
-browser bundle id, fetchIcons) · `icons/<host>.png`.
+activeThemeId, browser bundle id, fetchIcons) · `icons/<host>.png` (`<host>_<port>.png` for a non-standard port).
 
 The export file is `{"app":"Bookmark Manager","version":1,"exportedAt":…,"secretsIncluded":bool,"library":{…}}`
 with the library exactly as in library.json (plus the secrets when included).

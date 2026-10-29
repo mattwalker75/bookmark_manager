@@ -33,3 +33,20 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   the link glyph when none; can be turned off.
 - 2026-10-28: **Scripts, icon, docs** — BUILD_APP.sh / INSTALL_APP.sh as in App Starter; icon 2 "Tabbed folder"
   rendered by make_icns.sh without a browser; user guide, scripts and development docs; 48 tests.
+
+### Fixed
+- 2026-10-28: **Deep review, core (13 verified findings, each with a regression test).** A damaged library.json
+  now takes a copy of secrets.enc aside with it, so the next save can't prune the secrets the recovered file
+  needs. Saving is two-phase (secrets old ∪ new → library.json → prune), so a save that fails on library.json
+  loses no secret. The site-icon parser crashed on pages with letters like İ (it indexed the original text with a
+  lowercased copy's indices); it now searches case-insensitively in place. The app's own export always validates
+  (color codes need a name; a levels setting below what exists is repaired on load). Repeated ids are repaired on
+  load and import. A drop onto the directory an item is already in keeps its place. Search ignores accents.
+  Export files with an odd date or a text version still read, and a wrong shape names the place. Secrets messages
+  no longer ask the user to move files the app already moved. Delete refusals count what the person sees.
+- 2026-10-28: **Deep review, scripts and docs.** A failed build shows only the compiler's error lines (no
+  9,000-character command lines) and leaves no stale app in build/; INSTALL_APP.sh says when the tests could not
+  run, no longer warns about the app it moved out of build/, refuses --copy with --no-copy, says when it closes
+  the open app. ⇧⌘N follows the New directory rule (inside, or beside when the levels don't allow deeper) instead
+  of offering a directory that is always refused. Import… → Replace everything asks once more. Wording made
+  consistent (color, directory list, level-3 directory, no bundle ids); docs corrected where they overstated.
