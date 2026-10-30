@@ -15,7 +15,7 @@ struct SettingsView: View {
             BackupsPane().tabItem { Label("Backups", systemImage: "clock.arrow.circlepath") }.tag("backups")
             TransferPane().tabItem { Label("Export & import", systemImage: "square.and.arrow.up.on.square") }.tag("transfer")
         }
-        .frame(width: 680, height: 560)
+        .frame(width: 700, height: 700)   // tall enough for the Backups list and General's Links section (review 2)
     }
 }
 

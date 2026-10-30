@@ -372,14 +372,13 @@ struct TreeRow: View {
                 Spacer(minLength: 4)
                 Text(count).font(DS.secondary).foregroundStyle(.secondary).monospacedDigit().padding(.top, 1)
             }
-            .contentShape(Rectangle())
-            .onTapGesture { model.select(path) }
         }
         .padding(.vertical, 6).padding(.horizontal, 8)
         .padding(.leading, CGFloat(max(0, depth - 1)) * 18)
         .background(background, in: RoundedRectangle(cornerRadius: DS.radiusSmall))
         .overlay(RoundedRectangle(cornerRadius: DS.radiusSmall).strokeBorder(Theme.accent, lineWidth: targeted ? 2 : (model.highlightId == folder.id ? 2 : 0)))
         .contentShape(Rectangle())
+        .onTapGesture { model.select(path) }   // the whole row, padding included (the chevron Button takes its own clicks first)
         .onHover { over = $0 }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
@@ -493,16 +492,17 @@ struct FolderDetail: View {
                     if let c = model.color(f.colorId) { Circle().fill(c.rgb.color).frame(width: 12, height: 12).help(c.name).accessibilityLabel("Color code \(c.name)") }
                     Text(f.name).font(DS.title).lineLimit(2)
                 }
-                if !f.description.isEmpty { Text(f.description).font(DS.secondary).foregroundStyle(.secondary) }
-                else { Text(subtitle(f)).font(DS.secondary).foregroundStyle(.secondary) }
+                if !f.description.isEmpty { Text(f.description).font(DS.secondary).foregroundStyle(.secondary).lineLimit(2) }
+                else { Text(subtitle(f)).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1) }
             }
-            Spacer()
-            Button("Sort by name") { model.sortByName(path) }.disabled(f.folders.count + f.bookmarks.count < 2).help("Sort the sub-directories and bookmarks here by name, once")
+            Spacer(minLength: 12)
+            // the buttons keep their words at any width; the title and subtitle give way instead
+            Button("Sort by name") { model.sortByName(path) }.disabled(f.folders.count + f.bookmarks.count < 2).help("Sort the sub-directories and bookmarks here by name, once").fixedSize()
             if path.depth + 1 <= model.library.maxDepth {
-                Button { model.sheet = .newFolder(path) } label: { Label("New directory", systemImage: "folder.badge.plus") }
+                Button { model.sheet = .newFolder(path) } label: { Label("New directory", systemImage: "folder.badge.plus") }.fixedSize()
             }
-            Button(path.isTabRoot ? "Rename tab…" : "Edit…") { model.sheet = path.isTabRoot ? .renameTab(f) : .editFolder(f) }
-            Button { model.sheet = .newBookmark(path) } label: { Label("New bookmark", systemImage: "plus") }.buttonStyle(.borderedProminent)
+            Button(path.isTabRoot ? "Rename tab…" : "Edit…") { model.sheet = path.isTabRoot ? .renameTab(f) : .editFolder(f) }.fixedSize()
+            Button { model.sheet = .newBookmark(path) } label: { Label("New bookmark", systemImage: "plus") }.buttonStyle(.borderedProminent).fixedSize()
         }
         .controlSize(.large)
     }

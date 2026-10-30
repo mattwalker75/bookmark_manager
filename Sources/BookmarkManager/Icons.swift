@@ -98,19 +98,33 @@ enum IconFetcher {
     static func fetch(site page: URL) async -> (image: NSImage, png: Data)? {
         guard let root = root(of: page) else { return nil }
         var html: String?
-        if let (data, response) = try? await session.data(for: request(root, accept: "text/html")),
-           (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true, data.count < 2_000_000 {
-            html = String(data: data.prefix(300_000), encoding: .utf8) ?? String(decoding: data.prefix(300_000), as: UTF8.self)
+        if let data = await read(request(root, accept: "text/html"), upTo: 300_000) {
+            html = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
         }
         for candidate in Favicons.candidates(page: root, html: html).prefix(5) {
-            guard let (data, response) = try? await session.data(for: request(candidate, accept: "image/*")),
-                  (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
-                  data.count > 0, data.count < 3_000_000,
+            guard let data = await read(request(candidate, accept: "image/*"), upTo: 3_000_000), data.count > 0,
                   let image = NSImage(data: data), image.size.width > 0, image.size.width <= 4096, image.size.height <= 4096,
                   let png = scaled(image) else { continue }
             return (NSImage(data: png) ?? image, png)
         }
         return nil
+    }
+
+    /// At most `limit` bytes of a 2xx answer, read as they arrive and stopped there (review 2: a 50 MB page used to
+    /// be downloaded whole); nil for any other answer.
+    static func read(_ r: URLRequest, upTo limit: Int) async -> Data? {
+        guard let (bytes, response) = try? await session.bytes(for: r),
+              (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true else { return nil }
+        if response.expectedContentLength > Int64(limit) { bytes.task.cancel(); return nil }
+        var data = Data()
+        data.reserveCapacity(min(limit, max(0, Int(response.expectedContentLength))))
+        do {
+            for try await b in bytes {
+                data.append(b)
+                if data.count >= limit { bytes.task.cancel(); break }
+            }
+        } catch { if data.isEmpty { return nil } }
+        return data
     }
 
     private static func request(_ url: URL, accept: String) -> URLRequest {
@@ -136,12 +150,18 @@ enum IconFetcher {
         return rep.representation(using: .png, properties: [:])
     }
 
-    /// Accepts any server certificate (icons only; nothing secret is sent, no cookies, an ephemeral session).
-    final class AnyCertificate: NSObject, URLSessionDelegate {
+    /// Accepts any server certificate (icons only; nothing secret is sent, no cookies, an ephemeral session), and
+    /// follows a site only to http or https, never from https down to http (review 2).
+    final class AnyCertificate: NSObject, URLSessionTaskDelegate {
         func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
             if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, let t = challenge.protectionSpace.serverTrust {
                 completionHandler(.useCredential, URLCredential(trust: t))
-            } else { completionHandler(.performDefaultHandling, nil) }
+            } else { completionHandler(.cancelAuthenticationChallenge, nil) }
+        }
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+            let from = task.originalRequest?.url?.scheme?.lowercased() ?? "", to = request.url?.scheme?.lowercased() ?? ""
+            guard to == "http" || to == "https", !(from == "https" && to == "http") else { completionHandler(nil); return }
+            completionHandler(request)
         }
     }
 }

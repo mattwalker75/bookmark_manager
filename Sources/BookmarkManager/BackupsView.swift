@@ -13,6 +13,14 @@ struct BackupsPane: View {
     @State private var keeping: BackupEntry?
     @State private var passphraseSheet = false
     @State private var confirmDelete: BackupEntry?
+    @State private var confirmUnkeep: BackupEntry?
+    @State private var confirmRemovePassphrase = false
+
+    /// Unkeep asks when the backup would fall off at the very next prune.
+    private func unkeep(_ e: BackupEntry) {
+        let unkept = model.backups.filter { $0.readable && !$0.kept }.count
+        if unkept >= model.settings.backupKeep { confirmUnkeep = e } else { model.setKept(e, kept: false, note: "") }
+    }
 
     private var folderPath: String { model.backupStore.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~") }
 
@@ -27,12 +35,15 @@ struct BackupsPane: View {
                         if model.settings.backupFolder != nil { Button("Default") { model.settings.backupFolder = nil; model.refreshBackups() } }
                     }
                 }
-                Picker("When", selection: $model.settings.backupWhen) { ForEach(BackupWhen.allCases) { w in Text(w.label).tag(w) } }
-                Picker("Keep the latest", selection: $model.settings.backupKeep) { ForEach([5, 7, 14, 30, 90], id: \.self) { n in Text("\(n) backups").tag(n) } }
+                if !FileManager.default.fileExists(atPath: model.backupStore.folder.path) {
+                    Text(model.settings.backupFolder == nil ? "This folder doesn't exist yet; the first backup makes it." : "This folder doesn't exist right now (a disk that isn't plugged in?). Backups can't be written until it is back, or you choose another.")
+                        .font(DS.secondary).foregroundStyle(model.settings.backupFolder == nil ? Color.secondary : Theme.problem)
+                }
+                Picker("When", selection: $model.settings.backupWhen) { ForEach(BackupWhen.allCases) { w in Text(w.label).tag(w) } }.disabled(!model.settings.backupsEnabled)
+                Picker("Keep the latest", selection: $model.settings.backupKeep) { ForEach([5, 7, 14, 30, 90], id: \.self) { n in Text("\(n) backups").tag(n) } }.disabled(!model.settings.backupsEnabled)
                 Text("A backup is one file holding everything — tabs, directories, bookmarks, color codes and the secrets — written only when something changed since the last one. Older backups fall off the end; the ones you mark as kept never do. Back up into a folder your Mac already copies elsewhere (iCloud Drive, Time Machine, Data Syncer) and you have it off this disk too. Switched off, nothing is written on its own; Back up now and the safety backup before a restore still work.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
-            .disabled(false)
             Section("The secrets inside") {
                 Picker("Written as", selection: Binding(get: { model.settings.backupSecretsPlain }, set: { model.setBackupSecretsPlain($0) })) {
                     Text("Sealed with this Mac's secret key").tag(false)
@@ -57,7 +68,7 @@ struct BackupsPane: View {
                     Text(model.settings.backupPassphrase == nil ? "No passphrase set." : model.backupPassphraseStale ? "A passphrase is set, but it no longer matches." : "A passphrase is set: backups also open with it.")
                     Spacer()
                     Button(model.settings.backupPassphrase == nil ? "Set a passphrase…" : "Change…") { passphraseSheet = true }
-                    if model.settings.backupPassphrase != nil { Button("Remove") { model.clearBackupPassphrase() } }
+                    if model.settings.backupPassphrase != nil { Button("Remove") { confirmRemovePassphrase = true } }
                 }
                 Text("Optional. With a passphrase, every backup from then on also opens with the words alone — nothing to keep but the passphrase. Restore asks for it when this Mac doesn't have the key.")
                     .font(DS.secondary).foregroundStyle(.secondary)
@@ -86,6 +97,14 @@ struct BackupsPane: View {
             Button("Delete") { if let e = confirmDelete { model.deleteBackup(e) }; confirmDelete = nil }
             Button("Cancel", role: .cancel) { confirmDelete = nil }.keyboardShortcut(.defaultAction)
         } message: { Text("The file is removed from the backups folder. Nothing in the app changes.") }
+        .confirmationDialog("Stop keeping the backup from \(confirmUnkeep.map { $0.createdAt.formatted(date: .abbreviated, time: .shortened) } ?? "")?", isPresented: Binding(get: { confirmUnkeep != nil }, set: { if !$0 { confirmUnkeep = nil } }), titleVisibility: .visible) {
+            Button("Unkeep") { if let e = confirmUnkeep { model.setKept(e, kept: false, note: "") }; confirmUnkeep = nil }
+            Button("Cancel", role: .cancel) { confirmUnkeep = nil }.keyboardShortcut(.defaultAction)
+        } message: { Text("There are already \(model.settings.backupKeep) newer backups, so this one would be deleted at the next backup.") }
+        .confirmationDialog("Remove the backup passphrase?", isPresented: $confirmRemovePassphrase, titleVisibility: .visible) {
+            Button("Remove") { model.clearBackupPassphrase() }
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+        } message: { Text("Backups from now on open only with this Mac's key file. Earlier backups keep the passphrase they were written with.") }
     }
 
     private func row(_ e: BackupEntry) -> some View {
@@ -103,7 +122,7 @@ struct BackupsPane: View {
             Spacer()
             if e.readable {
                 Button("Verify…") { checking = e.url }.controlSize(.small)
-                Button(e.kept ? "Unkeep" : "Keep…") { if e.kept { model.setKept(e, kept: false, note: "") } else { keeping = e } }.controlSize(.small)
+                Button(e.kept ? "Unkeep" : "Keep…") { if e.kept { unkeep(e) } else { keeping = e } }.controlSize(.small)
             }
             Button { confirmDelete = e } label: { Image(systemName: "trash") }.controlSize(.small).help("Delete this backup file").accessibilityLabel("Delete")
         }

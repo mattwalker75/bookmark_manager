@@ -16,7 +16,7 @@ struct BookmarkManagerApp: App {
                 .preferredColorScheme(model.lookInForce.colorScheme)
                 .tint(Theme.accent)
                 .font(DS.body)
-                .frame(minWidth: 900, minHeight: 560)
+                .frame(minWidth: 900, minHeight: 740)   // the tallest editor sheet (700) fits (review 2)
                 .onAppear {
                     model.addSampleIfAsked()
                     model.runScheduledLinkCheckIfDue()

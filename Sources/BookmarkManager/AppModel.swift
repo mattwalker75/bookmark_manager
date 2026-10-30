@@ -55,12 +55,19 @@ final class AppModel: ObservableObject {
     @Published var highlightId: UUID?
     /// bump to put the keyboard in the search box (⌘F)
     @Published var focusSearch = 0
-    @Published var settings = AppSettings.load() { didSet { guard settings != oldValue else { return }; settings.save(); Theme.apply(settings); icons.enabled = settings.fetchIcons } }
+    @Published var settings = AppSettings.load() { didSet {
+        guard settings != oldValue else { return }
+        settings.save(); Theme.apply(settings); icons.enabled = settings.fetchIcons
+        if settings.secretHideMinutes != oldValue.secretHideMinutes { SecretWindows.rearmAll() }
+    } }
     @Published var settingsTab = "general"
     /// the last link check's outcome (kept on disk), and the one running now
     @Published var linkReport: LinkReport?
     @Published var linkProgress: LinkCheckProgress?
+    /// a sentence for the sheet when a run ended without a report (nothing answered, or it was stopped at once)
+    @Published var linkNote: String?
     private var linkTask: Task<Void, Never>?
+    private var linkManualAsked = false
     @Published var previewLook: Appearance?
     var lookInForce: Appearance { previewLook ?? settings.effectiveAppearance }
 
@@ -112,37 +119,53 @@ final class AppModel: ObservableObject {
     /// Whether the schedule says a check is due now.
     func linkCheckDue(now: Date = Date()) -> Bool {
         guard settings.linkCheckDays > 0 else { return false }
-        guard let last = linkReport?.checkedAt else { return true }
+        let last = [linkReport?.checkedAt, settings.lastLinkCheckAt].compactMap { $0 }.max()
+        guard let last else { return true }
         return now.timeIntervalSince(last) >= TimeInterval(settings.linkCheckDays) * 86_400
     }
 
     /// Checks every address (or one directory's). `automatic` = run by the schedule: no sheet, a banner instead.
     /// `inMainWindow` = false when Settings shows the sheet itself.
     func checkLinks(in path: FolderPath? = nil, automatic: Bool = false, inMainWindow: Bool = true) {
-        guard linkTask == nil else { if !automatic, inMainWindow { sheet = .linkReport }; return }
+        guard linkTask == nil else {
+            if !automatic { linkManualAsked = true; if inMainWindow { sheet = .linkReport } }
+            return
+        }
         let bookmarks = path.flatMap { library.folder(at: $0) }?.allBookmarks ?? library.allBookmarks
         let items = bookmarks.compactMap { b in b.link.map { (id: b.id, url: $0) } }.filter { ["http", "https"].contains($0.url.scheme ?? "") }
         let scope = path.map { placeName($0) }
         linkProgress = LinkCheckProgress(total: items.count)
+        linkNote = nil
+        linkManualAsked = !automatic
         if !automatic, inMainWindow { sheet = .linkReport }
         let started = Date()
         linkTask = Task { [weak self] in
             let found = await LinkChecker.check(items) { [weak self] n in self?.linkProgress?.done = n }
             guard let self else { return }
             let cancelled = Task.isCancelled
-            var report = LinkReport(checkedAt: Date(), checked: found.count, problems: found.filter(\.verdict.isProblem), scope: scope, automatic: automatic, seconds: Date().timeIntervalSince(started))
-            if scope != nil, let old = linkReport {
-                // one directory checked: the other directories' marks stay as they were, and count as checked
-                // (review 2: otherwise the summary could read "5 of 2 addresses")
-                let ids = Set(items.map(\.id))
+            let wasAutomatic = automatic && !linkManualAsked
+            defer { linkProgress = nil; linkTask = nil }
+            if found.isEmpty, cancelled { linkNote = "Stopped before any address had answered. The last results were kept."; return }
+            // nothing at all answered: that is this Mac's connection, not the bookmarks — the last results stay
+            if found.count >= 2, found.allSatisfy({ if case .unreachable = $0.verdict { return true }; return false }) {
+                linkNote = "Nothing answered at all, so this probably isn't about the bookmarks — no connection, most likely. The last results were kept."
+                if wasAutomatic { settings.lastLinkCheckAt = Date() }   // tried; the schedule waits its turn again
+                return
+            }
+            var report = LinkReport(checkedAt: Date(), checked: found.count, problems: found.filter(\.verdict.isProblem), scope: scope, automatic: wasAutomatic, seconds: Date().timeIntervalSince(started))
+            if scope != nil || cancelled, let old = linkReport {
+                // one directory checked (or a run stopped part way): the other marks stay as they were, and count as checked
+                let ids = Set(found.map(\.bookmarkId))
                 let elsewhere = old.problems.filter { !ids.contains($0.bookmarkId) }
                 report.problems += elsewhere
                 report.checked += elsewhere.count
-                report.scope = nil
+                if cancelled { report.scope = scope ?? "stopped part way"; report.automatic = old.automatic; report.bannerDismissed = old.bannerDismissed }
             }
-            if !cancelled || !found.isEmpty { linkReport = report; report.save(in: store.folder) }
-            linkProgress = nil
-            linkTask = nil
+            linkReport = report
+            settings.lastLinkCheckAt = report.checkedAt
+            if !report.save(in: store.folder), !wasAutomatic {
+                notice = Notice(title: "The link check's results could not be saved", message: "They are shown now, but will be gone at the next launch. \(store.folder.path) may be read-only or full.")
+            }
         }
     }
     func cancelLinkCheck() { linkTask?.cancel() }
@@ -150,15 +173,20 @@ final class AppModel: ObservableObject {
     /// "Use new address" on a moved bookmark.
     func useNewAddress(_ r: LinkResult) {
         guard case .moved(let to) = r.verdict, var b = library.bookmark(r.bookmarkId) else { return }
+        guard b.url == r.url else { notice = Notice(title: "The address was changed since", message: "“\(b.name)” no longer has the address that was checked, so the new one wasn't put in. Check the links again."); return }
+        guard let u = URL(string: to), ["http", "https"].contains(u.scheme?.lowercased() ?? "") else {
+            notice = Notice(title: "Not an address for a bookmark", message: "The site sends “\(b.name)” to \(to), which isn't a web address. Edit the bookmark yourself if you want to follow it."); return
+        }
         b.url = to
-        updateBookmark(b)
+        guard change("The bookmark wasn't saved", { try $0.updateBookmark(b) }) else { return }
+        icons.warm(b.url); SecretWindows.refresh(b)
         linkReport?.problems.removeAll { $0.bookmarkId == r.bookmarkId }
         linkReport?.save(in: store.folder)
     }
     /// Show in place from the link sheet: the bookmark's directory, with its row marked.
     func reveal(bookmark id: UUID) {
         guard let p = library.location(ofBookmark: id) else { return }
-        query = ""; select(p); flash(id)
+        query = ""; select(p); focusId = id; flash(id)
     }
     /// The schedule: a quiet check a few seconds after launch when one is due.
     func runScheduledLinkCheckIfDue() {
@@ -232,11 +260,14 @@ final class AppModel: ObservableObject {
         guard let cur = focusId, let i = rows.firstIndex(of: cur) else { focusId = delta >= 0 ? rows.first : rows.last; return }
         focusId = rows[min(max(i + delta, 0), rows.count - 1)]
     }
-    /// the focused row's bookmark, if it is one
-    var focusedBookmark: Bookmark? { focusId.flatMap { library.bookmark($0) } }
+    /// the focused row's bookmark, if it is one and still on the page (a row dragged away or deleted is nobody's focus)
+    var focusedBookmark: Bookmark? {
+        guard let id = focusId, keyboardRows.contains(id) else { return nil }
+        return library.bookmark(id)
+    }
     /// Return: a bookmark opens (a secret-only one shows its secret), a directory is opened on the page.
     func activateFocus() {
-        guard let id = focusId else { return }
+        guard let id = focusId, keyboardRows.contains(id) else { return }
         if isSearching {
             guard let hit = hits.first(where: { $0.id == id }) else { return }
             if case .bookmark(let b) = hit.kind { open(b) } else { query = ""; select(hit.path) }
@@ -277,6 +308,7 @@ final class AppModel: ObservableObject {
         query = ""
         select(hit.isFolder ? (hit.path.parent ?? hit.path) : hit.path)
         if hit.isFolder, let parent = hit.path.parent, !parent.isTabRoot { setExpanded(parent.folderId, true) }   // the found directory's row is in view
+        focusId = hit.id   // the page scrolls to it, and the arrow keys start there
         flash(hit.id)
     }
 
@@ -440,8 +472,17 @@ final class AppModel: ObservableObject {
         do { try work(&lib) } catch { notice = Notice(title: title, message: (error as? BMError)?.message ?? error.localizedDescription); return false }
         guard lib != library else { return true }
         let old = library
+        let rowsBefore = keyboardRows
         library = lib
         if !save() { library = old; fixSelection(); return false }
+        // the arrow keys stay on the page: a focused row that went away hands the focus to the row in its place
+        if let f = focusId, !keyboardRows.contains(f) {
+            let now = keyboardRows
+            focusId = rowsBefore.firstIndex(of: f).flatMap { i in now.isEmpty ? nil : now[min(i, now.count - 1)] }
+        }
+        // open branches of directories that no longer exist are forgotten right away, not at the next launch
+        let known = Set(library.allFolders.map(\.id))
+        if !settings.expanded.isSubset(of: known) { settings.expanded.formIntersection(known) }
         return true
     }
 
@@ -611,6 +652,8 @@ struct AppSettings: Codable, Equatable {
     var touchIDForSecrets = false
     /// check every address on its own every this many days; 0 = never (Matt, Oct 29 2026)
     var linkCheckDays = 0
+    /// when the last check finished or was tried (so a check that could not be saved doesn't run on every launch)
+    var lastLinkCheckAt: Date?
     // backups (Matt, Oct 29 2026)
     var backupsEnabled = true
     /// nil = <home>/Backups
@@ -644,6 +687,7 @@ struct AppSettings: Codable, Equatable {
         secretHideMinutes = max(0, read(.secretHideMinutes, 5))
         touchIDForSecrets = read(.touchIDForSecrets, false)
         linkCheckDays = max(0, read(.linkCheckDays, 0))
+        lastLinkCheckAt = readOptional(.lastLinkCheckAt)
         backupsEnabled = read(.backupsEnabled, true)
         backupFolder = (readOptional(.backupFolder) as String?).flatMap { $0.isEmpty ? nil : $0 }
         backupWhen = read(.backupWhen, .dailyAndQuit)

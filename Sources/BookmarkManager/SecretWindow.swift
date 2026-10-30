@@ -19,15 +19,21 @@ enum SecretWindows {
     /// chrome around it, never smaller than `floor`, never wider than 60% or taller than 70% of `screen` (Matt,
     /// Oct 29 2026: grow to fit, up to a cap). A secret longer than that scrolls inside.
     static func fittedSize(for text: String, screen: NSSize) -> NSSize {
-        let lines = text.isEmpty ? [SecretView.emptyText] : text.components(separatedBy: "\n")
+        let shown = text.isEmpty ? SecretView.emptyText : text
+        let lines = shown.components(separatedBy: "\n")
         let lineHeight = ceil(font.ascender - font.descender + font.leading)
         let widest = lines.map { ceil(($0 as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
         // around the text: the view's padding (16 each side), the text view's inset (6) and line padding (5), the scroller and bezel
-        let width = widest + 2 * 16 + 2 * 6 + 2 * 5 + 20
-        // above and below it: padding, the tip row, two gaps, the buttons, the text view's inset, the bezel
-        let height = CGFloat(lines.count) * lineHeight + 2 * 16 + 20 + 2 * 12 + 28 + 2 * 8 + 4
+        let chromeWidth: CGFloat = 2 * 16 + 2 * 6 + 2 * 5 + 20
         let cap = NSSize(width: max(floor.width, (screen.width * 0.6).rounded(.down)), height: max(floor.height, (screen.height * 0.7).rounded(.down)))
-        return NSSize(width: min(max(width, floor.width), cap.width), height: min(max(height, floor.height), cap.height))
+        let width = min(max(widest + chromeWidth, floor.width), cap.width)
+        // the rows as the text view will wrap them at that width (review 2: one very long line used to count as one row)
+        let textWidth = width - chromeWidth
+        let wrapped = (shown as NSString).boundingRect(with: CGSize(width: textWidth, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font]).height
+        let rows = max(CGFloat(lines.count) * lineHeight, ceil(wrapped))
+        // above and below it: padding, the tip row, two gaps, the buttons, the text view's inset, the bezel
+        let height = rows + 2 * 16 + 20 + 2 * 12 + 28 + 2 * 8 + 4
+        return NSSize(width: width, height: min(max(height, floor.height), cap.height))
     }
 
     private static func screenSize() -> NSSize {
@@ -37,17 +43,32 @@ enum SecretWindows {
 
     static func isOpen(_ id: UUID) -> Bool { windows[id] != nil }
 
-    /// The window hides itself after Settings' minutes without being used (0 = never); using it again restarts the clock.
+    /// The window hides itself after Settings' minutes without being used (0 = never). "Used" is a click, a key or a
+    /// scroll in it (one event monitor for all secret windows); when the clock runs out on a window used since, it
+    /// is wound again for the time left.
     static func arm(_ id: UUID) {
         guard let holder = holders[id] else { return }
         holder.timer?.invalidate(); holder.timer = nil
         let minutes = holder.model?.settings.secretHideMinutes ?? 0
         guard minutes > 0 else { return }
-        holder.timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(minutes) * 60, repeats: false) { _ in
+        let interval = TimeInterval(minutes) * 60
+        let wait = max(1, interval - Date().timeIntervalSince(holder.lastUsed))
+        holder.timer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { _ in
             MainActor.assumeIsolated {
-                // the window you are working in stays (review 2); one you left behind goes
-                if windows[id]?.isKeyWindow == true { arm(id) } else { close(id) }
+                guard let h = holders[id] else { return }
+                if Date().timeIntervalSince(h.lastUsed) < interval { arm(id) } else { close(id) }
             }
+        }
+    }
+    /// Settings changed: every open window follows the new minutes (or stops counting at Never).
+    static func rearmAll() { for id in windows.keys { arm(id) } }
+
+    private static var activityMonitor: Any?
+    private static func watchActivity() {
+        guard activityMonitor == nil else { return }
+        activityMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .scrollWheel, .leftMouseDragged]) { e in
+            if let w = e.window, let id = windows.first(where: { $0.value === w })?.key { holders[id]?.lastUsed = Date() }
+            return e
         }
     }
 
@@ -67,6 +88,7 @@ enum SecretWindows {
         holder.fitted = size
         windows[b.id] = w; holders[b.id] = holder
         w.makeKeyAndOrderFront(nil)
+        watchActivity()
         arm(b.id)
     }
 
@@ -95,6 +117,7 @@ enum SecretWindows {
 
     fileprivate static func used(_ w: NSWindow) {
         guard let id = windows.first(where: { $0.value === w })?.key else { return }
+        holders[id]?.lastUsed = Date()
         arm(id)
     }
 
@@ -118,6 +141,8 @@ final class SecretHolder: ObservableObject {
     var fitted = NSSize.zero
     /// hides the window after Settings' minutes
     var timer: Timer?
+    /// the last click, key or scroll in the window (or when it came forward)
+    var lastUsed = Date()
     weak var model: AppModel?
     init(bookmark: Bookmark) { self.bookmark = bookmark }
 }

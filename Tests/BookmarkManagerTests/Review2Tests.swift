@@ -94,7 +94,7 @@ final class Review2Tests: XCTestCase {
         XCTAssertEqual(Set(scoped.problems.map(\.bookmarkId)), Set(all.problems.map(\.bookmarkId)))
         XCTAssertGreaterThanOrEqual(scoped.checked, scoped.problems.count, scoped.summary)
         XCTAssertEqual(scoped.checked, m.library.tab(work.id)!.allBookmarks.filter { !$0.isSecretOnly }.count + 1)
-        XCTAssertNil(scoped.scope); XCTAssertFalse(scoped.automatic)
+        XCTAssertEqual(scoped.scope, work.name, "the sheet says which directory was checked"); XCTAssertFalse(scoped.automatic)
     }
 
     func testTheMissingBrowserIsMentionedOncePerBookmark() throws {

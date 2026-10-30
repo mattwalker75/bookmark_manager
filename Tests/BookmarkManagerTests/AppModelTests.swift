@@ -392,6 +392,7 @@ final class KeyboardTests: XCTestCase {
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString("before", forType: .string)
         m.focusId = secretOnly.id; m.copyFocusedAddress()
         XCTAssertEqual(NSPasteboard.general.string(forType: .string), "before", "a secret-only item has no address to copy")
+        m.select(try XCTUnwrap(m.library.location(ofBookmark: web.id)))   // the focus only acts on rows that are on the page
         m.focusId = web.id; m.copyFocusedAddress()
         XCTAssertEqual(NSPasteboard.general.string(forType: .string), web.link?.absoluteString)
     }

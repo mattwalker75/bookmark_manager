@@ -79,9 +79,10 @@ struct BookmarkEditor: View {
                             .font(DS.secondary).foregroundStyle(.secondary)
                     }
                 }
-                if let problem { Text(problem).font(DS.secondary).foregroundStyle(Theme.problem) }
             }
             .formStyle(.grouped)
+            // the refusal sits above the buttons, where it is seen (review 2: at the end of the form it was below the fold)
+            if let problem { Text(problem).font(DS.secondary).foregroundStyle(Theme.problem).fixedSize(horizontal: false, vertical: true) }
             HStack {
                 if !isNew { Button("Delete…") { confirmDelete = true } }
                 Spacer()
@@ -101,7 +102,7 @@ struct BookmarkEditor: View {
         var b = bookmark
         b.tags = Bookmark.parseTags(tagsText)
         if kind == .secretOnly {
-            b.url = ""; b.hasSecret = true
+            b.url = ""; b.hasSecret = true; b.browser = nil
             // a brand-new secret with nothing typed would be an empty row (an imported one may be blank until retyped)
             if isNew, b.secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { problem = "Type the secret first — a secret-only item with no text would be empty."; return }
         }
