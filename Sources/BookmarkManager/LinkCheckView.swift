@@ -24,7 +24,7 @@ struct LinkReportSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 760, height: 580)
+        .frame(width: 820, height: 600)
     }
 
     private func progress(_ p: LinkCheckProgress) -> some View {
@@ -89,26 +89,49 @@ struct LinkReportSheet: View {
         let b = model.library.bookmark(p.bookmarkId)
         let stale = b.map { $0.url != p.url } ?? false   // the address was edited since: nothing to act on
         let place = b.flatMap { model.library.location(ofBookmark: $0.id) }.map { model.placeName($0) } ?? ""
-        return HStack(alignment: .center, spacing: 12) {
-            Circle().fill(color(p.verdict.group)).frame(width: 10, height: 10)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name(p)).fontWeight(.semibold).lineLimit(1)
-                Text(place.isEmpty ? p.url : "\(place) · \(p.url)" + movedSuffix(p)).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .center, spacing: 12) {
+                Circle().fill(color(p.verdict.group)).frame(width: 10, height: 10)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name(p)).fontWeight(.semibold).lineLimit(1)
+                    Text(place.isEmpty ? p.url : "\(place) · \(p.url)").font(DS.secondary).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+                .layoutPriority(1)
+                Spacer(minLength: 8)
+                if stale { Text("address changed since").font(DS.secondary).foregroundStyle(.secondary) }
+                Text(p.verdict.text).font(DS.secondary).foregroundStyle(color(p.verdict.group))
+                    .padding(.horizontal, 8).padding(.vertical, 2).background(color(p.verdict.group).opacity(0.14), in: Capsule()).fixedSize()
+                if b != nil {
+                    Button("Show in place") { dismiss(); model.reveal(bookmark: p.bookmarkId); front() }.controlSize(.small).fixedSize()
+                    Button("Edit…") { dismiss(); if let b { model.sheet = .editBookmark(b) }; front() }.controlSize(.small).fixedSize()
+                }
             }
-            Spacer(minLength: 8)
-            if stale { Text("address changed since").font(DS.secondary).foregroundStyle(.secondary) }
-            Text(p.verdict.text).font(DS.secondary).foregroundStyle(color(p.verdict.group))
-                .padding(.horizontal, 8).padding(.vertical, 2).background(color(p.verdict.group).opacity(0.14), in: Capsule())
-            if b != nil {
-                if case .moved = p.verdict, !stale { Button("Use new address") { model.useNewAddress(p) }.controlSize(.small) }
-                Button("Show in place") { dismiss(); model.reveal(bookmark: p.bookmarkId); front() }.controlSize(.small)
-                Button("Edit…") { dismiss(); if let b { model.sheet = .editBookmark(b) }; front() }.controlSize(.small)
+            if case .moved(let to) = p.verdict {
+                // the new address on a line of its own, in full and selectable, with a look before it is taken
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("Now at").font(DS.secondary).foregroundStyle(.secondary)
+                    Text(to).font(DS.secondary).foregroundStyle(Theme.accent).textSelection(.enabled).lineLimit(2).truncationMode(.middle)
+                        .contextMenu {
+                            Button("Copy new address") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(to, forType: .string) }
+                            Button("Open new address") { openNew(to) }
+                        }
+                    Spacer(minLength: 8)
+                    if b != nil, !stale {
+                        Button("Open new…") { openNew(to) }.controlSize(.small).fixedSize().help("Open the new address in the browser, to look before taking it")
+                        Button("Use new address") { model.useNewAddress(p) }.controlSize(.small).fixedSize().help("Put the new address into the bookmark")
+                    }
+                }
+                .padding(.leading, 22)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
     }
 
-    private func movedSuffix(_ p: LinkResult) -> String { if case .moved(let to) = p.verdict { return " → \(to)" }; return "" }
+    /// The new address in the chosen browser, so it can be looked at before it is taken.
+    private func openNew(_ to: String) {
+        guard let u = URL(string: to), ["http", "https"].contains(u.scheme?.lowercased() ?? "") else { return }
+        Browsers.open(u, with: model.settings.browser) { _ in }
+    }
     /// From the Settings window, the main window comes forward to show the row.
     private func front() { NSApp.windows.first { $0.identifier?.rawValue == "main" }?.makeKeyAndOrderFront(nil) }
 }

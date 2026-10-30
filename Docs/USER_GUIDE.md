@@ -103,7 +103,8 @@ hidden until you ask for it.
 ## Checking links
 - Settings → General → **Check every address…** asks each bookmark's address once, a few at a time, and lists
   the ones that didn't answer as expected, each with where it lives: **gone** (the page is not there any more),
-  **moved** (the site says it has a new address — *Use new address* takes it), and **didn't answer** (no such site,
+  **moved** (the site says it has a new address — it is shown in full under the row, *Open new…* lets you look at
+  it in the browser first, *Use new address* puts it into the bookmark), and **didn't answer** (no such site,
   timed out, a server error, or a login page or robot block — those can still work fine in your browser). Show in
   place and Edit… are right there.
 - Right-click a directory → **Check links in this directory…** (or a tab → **Check links in this tab…**) does the
