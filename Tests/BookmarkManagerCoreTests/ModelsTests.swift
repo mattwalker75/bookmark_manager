@@ -183,3 +183,20 @@ final class SecretOnlyTests: XCTestCase {
         XCTAssertEqual(imported.bookmark(s.id)?.secret, "correct-horse")
     }
 }
+
+/// A browser per bookmark (Matt, Oct 29 2026): kept on the bookmark, carried by an export, blank means "Settings".
+final class BookmarkBrowserTests: XCTestCase {
+    func testTheBrowserIsKeptAndExportedAndBlankMeansNone() throws {
+        var lib = Library.fresh()
+        let tab = FolderPath(tab: lib.tabs[0].id)
+        let b = Bookmark(name: "AWS", url: "https://console.aws.amazon.com", browser: "com.google.Chrome")
+        try lib.addBookmark(b, in: tab)
+        XCTAssertEqual(lib.bookmark(b.id)?.browser, "com.google.Chrome")
+        let file = try Transfer.read(try Transfer.export(lib, includeSecrets: false))
+        XCTAssertEqual(file.library.bookmark(b.id)?.browser, "com.google.Chrome")
+        let old = try JSONDecoder().decode(Bookmark.self, from: Data(#"{"name":"x","url":"https://x.example"}"#.utf8))
+        XCTAssertNil(old.browser, "a bookmark from before the field has none")
+        let blank = try JSONDecoder().decode(Bookmark.self, from: Data(#"{"name":"x","url":"https://x.example","browser":""}"#.utf8))
+        XCTAssertNil(blank.browser, "an empty id is the same as none")
+    }
+}

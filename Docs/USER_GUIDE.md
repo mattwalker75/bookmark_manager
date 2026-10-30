@@ -44,6 +44,9 @@ hidden until you ask for it.
     The site's icon is fetched for the row — from the site's front page only, never from the bookmark's own
     address, and a few at a time.
   - **Tags** — optional words, separated by commas, for the search only. They never show on the row.
+  - **Opens in** — the browser from Settings unless you pick one of the installed browsers here, for the odd site
+    that only behaves in one of them. Set it and forget it: the row shows nothing about it. If that browser is
+    removed later, the bookmark opens in the Settings browser and says so once.
   - **Color** — one of the color codes from Settings; the row gets a light wash of that color.
   - **Secret** — tick *This bookmark has a secret* and type as many lines as you like (a user name, a password, a
     recovery address, a token, blank lines between for reading). It is kept encrypted on this Mac.

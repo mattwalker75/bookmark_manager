@@ -414,3 +414,23 @@ final class SecretGuardTests: XCTestCase {
         SecretGate.forget()
     }
 }
+
+/// Which browser a bookmark opens in (Matt, Oct 29 2026).
+@MainActor
+final class BrowserChoiceTests: XCTestCase {
+    func testOwnBrowserWinsWhenInstalledElseSettingsWithANote() {
+        let m = AppModel(); m.settings.fetchIcons = false; m.icons.enabled = false
+        m.settings.browser = "com.apple.Safari"
+        let plain = Bookmark(name: "a", url: "https://a.example")
+        let own = Bookmark(name: "b", url: "https://b.example", browser: "com.google.Chrome")
+        let plainChoice = m.browserChoice(for: plain) { _ in true }
+        XCTAssertEqual(plainChoice.id, "com.apple.Safari"); XCTAssertNil(plainChoice.note)
+        let ownChoice = m.browserChoice(for: own) { $0 == "com.google.Chrome" }
+        XCTAssertEqual(ownChoice.id, "com.google.Chrome"); XCTAssertNil(ownChoice.note)
+        let gone = m.browserChoice(for: own) { _ in false }
+        XCTAssertEqual(gone.id, "com.apple.Safari")
+        XCTAssertTrue(gone.note?.contains("isn't installed any more") ?? false)
+        m.settings.browser = nil
+        XCTAssertNil(m.browserChoice(for: own) { _ in false }.id, "falls back to the Mac's default when Settings has none")
+    }
+}

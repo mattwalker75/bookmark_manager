@@ -61,6 +61,8 @@ struct BookmarkEditor: View {
                             SiteIcon(address: bookmark.url, size: 24, fetch: false)
                         }
                     }
+                    // Matt, Oct 29 2026 (mockup option A): set here and forgotten, like the tags — the row shows nothing about it
+                    BrowserPicker(title: "Opens in", selection: $bookmark.browser)
                 }
                 Field("Tags", $tagsText, "Optional — words for the search, separated by commas")
                 Text("Tags are only used by the search; they never show on the row.").font(DS.secondary).foregroundStyle(.secondary)
@@ -120,6 +122,30 @@ struct BookmarkEditor: View {
         if destination != model.selectedPath { model.select(destination) }
         model.flash(b.id)
         dismiss()
+    }
+}
+
+/// "The browser from Settings", then every browser installed on this Mac. A bookmark's own browser, by bundle id.
+struct BrowserPicker: View {
+    @EnvironmentObject var model: AppModel
+    let title: String
+    @Binding var selection: String?
+    @State private var browsers: [Browser] = []
+
+    private var settingsName: String {
+        if let id = model.settings.browser, let u = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) { return Browsers.displayName(u) }
+        return Browsers.defaultName() ?? "the Mac's default"
+    }
+
+    var body: some View {
+        Picker(title, selection: $selection) {
+            Text("The browser from Settings (\(settingsName))").tag(String?.none)
+            ForEach(browsers) { b in Text(b.name).tag(String?.some(b.id)) }
+            if let chosen = selection, !browsers.contains(where: { $0.id == chosen }) {
+                Text("Not installed any more").tag(String?.some(chosen))
+            }
+        }
+        .onAppear { browsers = Browsers.installed() }
     }
 }
 

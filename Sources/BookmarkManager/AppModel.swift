@@ -283,7 +283,17 @@ final class AppModel: ObservableObject {
     func open(_ b: Bookmark) {
         if b.isSecretOnly { showSecret(b); return }   // nothing to open in a browser: "opening" it shows the secret
         guard let url = b.link else { notice = Notice(title: "“\(b.name)” can't be opened", message: "Its address “\(b.url)” isn't one a browser can open. Edit the bookmark and check the address."); return }
-        Browsers.open(url, with: settings.browser) { [weak self] problem in self?.notice = Notice(title: "“\(b.name)” didn't open", message: problem) }
+        let choice = browserChoice(for: b) { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil }
+        if let note = choice.note { notice = Notice(title: "“\(b.name)” opened in the usual browser", message: note) }
+        Browsers.open(url, with: choice.id) { [weak self] problem in self?.notice = Notice(title: "“\(b.name)” didn't open", message: problem) }
+    }
+
+    /// The browser a bookmark opens in: its own when it has one that is installed, else the one from Settings
+    /// (with a sentence when its own has gone missing).
+    func browserChoice(for b: Bookmark, installed: (String) -> Bool) -> (id: String?, note: String?) {
+        guard let own = b.browser else { return (settings.browser, nil) }
+        if installed(own) { return (own, nil) }
+        return (settings.browser, "The browser picked for this bookmark isn't installed any more, so the browser from Settings was used. Edit the bookmark to pick another, or set it back to the browser from Settings.")
     }
 
     func copyAddress(_ b: Bookmark) {

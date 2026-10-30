@@ -49,6 +49,9 @@ it is not a developer: every message is a plain sentence.
    row's directory; a bookmark dropped on a row lands before it; tabs reorder by dragging along the tab bar.
 5. **Opening:** a single click on the name opens it in the browser chosen in Settings → General (bundle id in
    settings.json; nil = the Mac's default; a vanished browser falls back with a notice). Right-click / the pencil edits.
+   **A bookmark may name its own browser** (`Bookmark.browser`, Matt Oct 29 2026, mockup option A): an "Opens in" row in
+   the editor only — NOTHING on the row and NO right-click "Open in" (Matt). `AppModel.browserChoice` picks it when
+   installed, else the Settings browser with a one-time sentence.
 5a. **The keyboard** (Matt, Oct 29 2026): `AppModel.focusId` is the row under ↑ ↓ (`keyboardRows` = the page's
     sub-directories then bookmarks, or the hits grouped by tab exactly as shown); Return `activateFocus`, Space the
     secret, ⌘L `copyFocusedAddress`, ⌘↑ `goUp` (the directory just left stays focused); Tabs menu ⌘1–9, ⌃Tab.
