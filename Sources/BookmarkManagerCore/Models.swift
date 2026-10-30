@@ -66,6 +66,10 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
         secret = try c.decodeIfPresent(String.self, forKey: .secret) ?? ""
     }
 
+    /// A secret-only item: no address at all (a passphrase for a phone, a Wi-Fi password). Its row shows a key
+    /// instead of a site icon, the name opens nothing, and its button says Secrets-Only.
+    public var isSecretOnly: Bool { url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
     /// The tags as typed in the editor: "one, two, three".
     public var tagsText: String { tags.joined(separator: ", ") }
     /// "one, two,three" → ["one", "two", "three"] (trimmed, blanks dropped, repeats dropped).
@@ -419,8 +423,10 @@ public struct Library: Codable, Equatable, Sendable {
         c.url = b.url.trimmingCharacters(in: .whitespacesAndNewlines)
         c.description = b.description.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !c.name.isEmpty else { throw BMError("The bookmark needs a name.") }
-        guard !c.url.isEmpty else { throw BMError("The bookmark needs an address.") }
-        guard Bookmark.link(from: c.url) != nil else {
+        if c.url.isEmpty {
+            // a secret-only item: no address, so it must carry a secret (Matt, Oct 29 2026)
+            guard c.hasSecret else { throw BMError("The bookmark needs an address, or a secret if it is a secret-only item.") }
+        } else if Bookmark.link(from: c.url) == nil {
             let l = c.url.lowercased()
             if l.hasPrefix("javascript:") || l.hasPrefix("data:") || l.hasPrefix("vbscript:") || l.hasPrefix("blob:") {
                 throw BMError("“\(c.url)” isn't an address a browser should open from a bookmark. It should look like https://example.com/page.")

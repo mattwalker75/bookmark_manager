@@ -63,7 +63,7 @@ final class TransferTests: XCTestCase {
             XCTAssertNotNil(hit, "missing “\(place): \(text)” in \(places)")
             if let hit { XCTAssertEqual(hit.stops, stops, place) }
         }
-        has("Work › Vendors › No address", "has no address", stops: true)
+        has("Work › Vendors › No address", "has no address and no secret", stops: true)
         has("Work › Vendors › Bad address", "can't be opened", stops: true)
         has("Work › Vendors › Odd color", "color code isn't in the file", stops: false)
         has("Work › Vendors › (no name)", "sub-directory has no name", stops: true)

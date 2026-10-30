@@ -73,23 +73,28 @@ struct HitRow: View {
         HStack(spacing: 12) {
             switch hit.kind {
             case .folder(let f): IconTile(systemName: "folder", color: model.color(f.colorId)?.rgb.color ?? .secondary)
+            case .bookmark(let b) where b.isSecretOnly: IconTile(systemName: "key.fill", color: DS.key).accessibilityHidden(true)
             case .bookmark(let b): SiteIcon(address: b.url)
             }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(Highlight.mark(hit.name, words)).fontWeight(.semibold).lineLimit(1)
-                        .foregroundStyle(nameOver ? Theme.accent : Color.primary).underline(nameOver)
-                        .contentShape(Rectangle())
-                        .onHover { nameOver = $0 }
-                        .onTapGesture { open() }
-                        .accessibilityAddTraits(hit.isFolder ? .isButton : .isLink)
+                    if secretOnly {
+                        Text(Highlight.mark(hit.name, words)).fontWeight(.semibold).lineLimit(1)
+                    } else {
+                        Text(Highlight.mark(hit.name, words)).fontWeight(.semibold).lineLimit(1)
+                            .foregroundStyle(nameOver ? Theme.accent : Color.primary).underline(nameOver)
+                            .contentShape(Rectangle())
+                            .onHover { nameOver = $0 }
+                            .onTapGesture { open() }
+                            .accessibilityAddTraits(hit.isFolder ? .isButton : .isLink)
+                    }
                     if hit.isFolder { Text("· \(Library.levelName(hit.path.depth))").font(DS.secondary).foregroundStyle(.secondary) }
                 }
                 Text(detail).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 8)
             if case .bookmark(let b) = hit.kind, b.hasSecret {
-                Button { model.showSecret(b) } label: { Label("Secret", systemImage: "key.fill").font(DS.secondary) }.buttonStyle(.bordered).controlSize(.small)
+                Button { model.showSecret(b) } label: { Label(b.secretButtonTitle, systemImage: "key.fill").font(DS.secondary) }.buttonStyle(.bordered).controlSize(.small)
             }
             Button("Show in place") { model.showInPlace(hit) }.buttonStyle(.bordered).controlSize(.small)
         }
@@ -99,8 +104,11 @@ struct HitRow: View {
         .onHover { over = $0 }
         .contextMenu {
             if case .bookmark(let b) = hit.kind {
-                Button("Open") { model.open(b) }
-                Button("Copy address") { model.copyAddress(b) }
+                if b.isSecretOnly { Button("Show secret") { model.showSecret(b) } }
+                else {
+                    Button("Open") { model.open(b) }
+                    Button("Copy address") { model.copyAddress(b) }
+                }
                 Button("Edit…") { model.sheet = .editBookmark(b) }
             } else if case .folder(let f) = hit.kind {
                 Button("Open") { model.select(hit.path) ; model.query = "" }
@@ -109,6 +117,8 @@ struct HitRow: View {
             Button("Show in place") { model.showInPlace(hit) }
         }
     }
+
+    private var secretOnly: Bool { if case .bookmark(let b) = hit.kind { return b.isSecretOnly }; return false }
 
     private func open() {
         switch hit.kind {

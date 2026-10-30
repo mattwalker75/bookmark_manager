@@ -7,9 +7,16 @@ import BookmarkManagerCore
 // MARK: - a bookmark
 
 struct BookmarkEditor: View {
+    /// What the item is (Matt's pick, mockup editor B): a web page with an optional secret, or only a secret.
+    enum Kind: String, CaseIterable, Identifiable {
+        case web = "Web page", secretOnly = "Secret only"
+        var id: String { rawValue }
+    }
+
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     let isNew: Bool
+    @State private var kind: Kind
     @State private var bookmark: Bookmark
     @State private var tagsText: String
     @State private var destination: FolderPath
@@ -17,29 +24,42 @@ struct BookmarkEditor: View {
     @State private var problem: String?
     @State private var confirmDelete = false
 
-    init(bookmark: Bookmark?, path: FolderPath) {
+    init(bookmark: Bookmark?, path: FolderPath, secretOnly: Bool = false) {
         isNew = bookmark == nil
-        let b = bookmark ?? Bookmark(name: "", url: "")
+        let b = bookmark ?? Bookmark(name: "", url: "", hasSecret: secretOnly)
+        _kind = State(initialValue: (bookmark?.isSecretOnly ?? secretOnly) ? .secretOnly : .web)
         _bookmark = State(initialValue: b)
         _tagsText = State(initialValue: b.tagsText)
         _destination = State(initialValue: path)
         original = path
     }
 
+    private var title: String {
+        if !isNew { return "Edit “\(bookmark.name)”" }
+        return kind == .secretOnly ? "New secret" : "New bookmark"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(isNew ? "New bookmark" : "Edit “\(bookmark.name)”").font(DS.heading).lineLimit(1)
+                Text(title).font(DS.heading).lineLimit(1)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.plain).help("Close without saving").accessibilityLabel("Close")
             }
+            Picker("Kind", selection: $kind) {
+                ForEach(Kind.allCases) { k in Label(k.rawValue, systemImage: k == .web ? "link" : "key.fill").tag(k) }
+            }
+            .pickerStyle(.segmented).labelsHidden().frame(width: 280)
+            .help("A web page (with a secret if you like), or an item that is only a secret — a passphrase, a Wi-Fi password")
             Form {
-                Field("Name", $bookmark.name, "People Manager")
+                Field("Name", $bookmark.name, kind == .secretOnly ? "Wi-Fi password" : "People Manager")
                 Field("Description", $bookmark.description, "Optional — a sentence or two, shown under the name")
-                LabeledContent("Address") {
-                    HStack(spacing: 8) {
-                        PlainTextField("https://example.com/page", text: $bookmark.url, monospaced: true, label: "Address")
-                        SiteIcon(address: bookmark.url, size: 24, fetch: false)
+                if kind == .web {
+                    LabeledContent("Address") {
+                        HStack(spacing: 8) {
+                            PlainTextField("https://example.com/page", text: $bookmark.url, monospaced: true, label: "Address")
+                            SiteIcon(address: bookmark.url, size: 24, fetch: false)
+                        }
                     }
                 }
                 Field("Tags", $tagsText, "Optional — words for the search, separated by commas")
@@ -47,10 +67,13 @@ struct BookmarkEditor: View {
                 LabeledContent("Color") { ColorPills(selection: $bookmark.colorId) }
                 DestinationPicker(title: "In", selection: $destination)
                 Section {
-                    Toggle("This bookmark has a secret", isOn: $bookmark.hasSecret)
-                    if bookmark.hasSecret {
-                        TextBox(text: $bookmark.secret, placeholder: "user name on one line, password on the next, blank lines between…", minLines: 4, maxLines: 10, label: "The secret")
-                        Text("Several lines, blank lines included. Kept encrypted on this Mac; shown only when you click Secret; left out of an export unless you tick the box.")
+                    if kind == .web { Toggle("This bookmark has a secret", isOn: $bookmark.hasSecret) }
+                    else { Text("The secret").fontWeight(.semibold) }
+                    if kind == .secretOnly || bookmark.hasSecret {
+                        TextBox(text: $bookmark.secret, placeholder: kind == .secretOnly ? "the passphrase, the PIN, a recovery code — as many lines as you like" : "user name on one line, password on the next, blank lines between…", minLines: 4, maxLines: 10, label: "The secret")
+                        Text(kind == .secretOnly
+                             ? "A secret-only item has no address: its row shows a key, and its Secrets-Only button opens this text. Several lines, blank lines included. Kept encrypted on this Mac; left out of an export unless you tick the box."
+                             : "Several lines, blank lines included. Kept encrypted on this Mac; shown only when you click Secret; left out of an export unless you tick the box.")
                             .font(DS.secondary).foregroundStyle(.secondary)
                     }
                 }
@@ -61,11 +84,11 @@ struct BookmarkEditor: View {
                 if !isNew { Button("Delete…") { confirmDelete = true } }
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button(isNew ? "Add bookmark" : "Save") { save() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                Button(isNew ? (kind == .secretOnly ? "Add secret" : "Add bookmark") : "Save") { save() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
             }
         }
         .padding(20)
-        .frame(width: 600, height: bookmark.hasSecret ? 700 : 560)
+        .frame(width: 600, height: kind == .secretOnly ? 640 : (bookmark.hasSecret ? 700 : 580))
         .confirmationDialog("Delete the bookmark “\(bookmark.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete") { model.deleteBookmark(bookmark.id); dismiss() }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
@@ -75,6 +98,11 @@ struct BookmarkEditor: View {
     private func save() {
         var b = bookmark
         b.tags = Bookmark.parseTags(tagsText)
+        if kind == .secretOnly {
+            b.url = ""; b.hasSecret = true
+            // a brand-new secret with nothing typed would be an empty row (an imported one may be blank until retyped)
+            if isNew, b.secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { problem = "Type the secret first — a secret-only item with no text would be empty."; return }
+        }
         // try it on a copy first, so a refusal shows here instead of closing the sheet
         var trial = model.library
         do {

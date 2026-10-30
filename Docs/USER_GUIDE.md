@@ -28,6 +28,9 @@ hidden until you ask for it.
 ## Bookmarks
 - **New bookmark** (the + in the title bar, the button on a directory's page, or ⌘N) adds one to the open
   directory (or the tab's top level); right-click a directory → **New bookmark here…** adds one to that directory.
+- The editor starts with a choice: **Web page** (an address, with a secret if you like) or **Secret only** (no
+  address at all — a passphrase for your phone, the Wi-Fi password). Right-click a directory → **New secret here…**
+  opens it with Secret only already picked. You can switch an item from one kind to the other later in Edit.
 - A bookmark has:
   - **Name** — what the row shows. Click it to open the address in your browser.
   - **Description** — optional, a sentence or two, shown in smaller text under the name.
@@ -41,6 +44,11 @@ hidden until you ask for it.
     recovery address, a token, blank lines between for reading). It is kept encrypted on this Mac.
 - The row shows the icon, the name, the description, a **Secret** button when there is one, and a pencil while
   the pointer is over it. Right-click for Open, Copy address, Show secret, Edit…, Move to…, Delete….
+- A **secret-only** item sits in the same list as everything else (drag it, color it, move it like any row). Its
+  row shows a key instead of a site icon, its name opens nothing, and its button says **Secrets-Only** — click
+  that, exactly as you click Secret on a web bookmark. Without a description the row says "Secret only — no address".
+  A secret-only item must have a secret: the editor won't add one with nothing typed, and it can't lose its secret
+  without getting an address instead.
 - Deleting a bookmark asks first. Its secret goes with it.
 
 ## Secrets

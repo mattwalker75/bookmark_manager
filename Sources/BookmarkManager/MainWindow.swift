@@ -37,6 +37,7 @@ struct MainWindow: View {
         .sheet(item: $model.sheet) { sheet in
             switch sheet {
             case .newBookmark(let p): BookmarkEditor(bookmark: nil, path: p)
+            case .newSecret(let p): BookmarkEditor(bookmark: nil, path: p, secretOnly: true)
             case .editBookmark(let b): BookmarkEditor(bookmark: b, path: model.library.location(ofBookmark: b.id) ?? model.selectedPath)
             case .newFolder(let p): FolderEditor(folder: nil, path: p)
             case .editFolder(let f): FolderEditor(folder: f, path: model.library.path(toFolder: f.id) ?? model.selectedPath)
@@ -50,7 +51,7 @@ struct MainWindow: View {
     }
 
     /// Development only, harmless when unset (for trying screens on a scratch BOOKMARKMANAGER_HOME):
-    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|editBookmark|newFolder|editFolder|newTab|move|secret|search:<text>|settings[:tab]
+    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|search:<text>|settings[:tab]
     private func developmentHooks() {
         guard let sheet = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_AUTOSHEET"] else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -58,6 +59,7 @@ struct MainWindow: View {
             let f = model.library.allFolders.first
             switch sheet {
             case "newBookmark": model.sheet = .newBookmark(model.selectedPath)
+            case "newSecret": model.sheet = .newSecret(model.selectedPath)
             case "editBookmark": if let b { model.sheet = .editBookmark(b) }
             case "newFolder": model.sheet = .newFolder(model.selectedPath)
             case "editFolder": if let f { model.sheet = .editFolder(f) }
@@ -287,6 +289,7 @@ struct TreeRow: View {
             Button("Open") { model.select(path) }
             if path.depth + 1 <= model.library.maxDepth { Button("New directory inside…") { model.sheet = .newFolder(path) } }
             Button("New bookmark here…") { model.sheet = .newBookmark(path) }
+            Button("New secret here…") { model.sheet = .newSecret(path) }
             Divider()
             Button(depth == 0 ? "Rename tab…" : "Edit…") { model.sheet = depth == 0 ? .renameTab(folder) : .editFolder(folder) }
             if depth > 0 { Button("Move to…") { model.sheet = .move(.folder(folder.id)) } }
@@ -495,23 +498,30 @@ struct BookmarkRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            SiteIcon(address: bookmark.url)
+            if bookmark.isSecretOnly { IconTile(systemName: "key.fill", color: DS.key).accessibilityHidden(true) }
+            else { SiteIcon(address: bookmark.url) }
             VStack(alignment: .leading, spacing: 2) {
-                Text(bookmark.name).fontWeight(.semibold).lineLimit(1)
-                    .foregroundStyle(nameOver ? Theme.accent : Color.primary)
-                    .underline(nameOver)
-                    .contentShape(Rectangle())
-                    .onHover { nameOver = $0 }
-                    .onTapGesture { model.open(bookmark) }
-                    .help("Open \(bookmark.link?.absoluteString ?? bookmark.url)")
-                    .accessibilityAddTraits(.isLink)
-                    .accessibilityHint("Opens it in the browser")
+                if bookmark.isSecretOnly {
+                    // nothing to open: the name is plain text, the Secrets-Only button is the thing to click
+                    Text(bookmark.name).fontWeight(.semibold).lineLimit(1)
+                } else {
+                    Text(bookmark.name).fontWeight(.semibold).lineLimit(1)
+                        .foregroundStyle(nameOver ? Theme.accent : Color.primary)
+                        .underline(nameOver)
+                        .contentShape(Rectangle())
+                        .onHover { nameOver = $0 }
+                        .onTapGesture { model.open(bookmark) }
+                        .help("Open \(bookmark.link?.absoluteString ?? bookmark.url)")
+                        .accessibilityAddTraits(.isLink)
+                        .accessibilityHint("Opens it in the browser")
+                }
                 if let place { Text(place).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1) }
                 else if !bookmark.description.isEmpty { Text(bookmark.description).font(DS.secondary).foregroundStyle(.secondary).lineLimit(2) }
+                else if bookmark.isSecretOnly { Text("Secret only — no address").font(DS.secondary).foregroundStyle(.secondary) }
             }
             Spacer(minLength: 8)
             if bookmark.hasSecret {
-                Button { model.showSecret(bookmark) } label: { Label("Secret", systemImage: "key.fill").font(DS.secondary) }
+                Button { model.showSecret(bookmark) } label: { Label(bookmark.secretButtonTitle, systemImage: "key.fill").font(DS.secondary) }
                     .buttonStyle(.bordered).controlSize(.small).help("Show the secret in its own window")
             }
             Button { model.sheet = .editBookmark(bookmark) } label: { Image(systemName: "pencil").font(.system(size: 12, weight: .semibold)) }
@@ -533,8 +543,10 @@ struct BookmarkRow: View {
             return model.drop(token, to: path)
         } isTargeted: { targeted = $0 }
         .contextMenu {
-            Button("Open") { model.open(bookmark) }
-            Button("Copy address") { model.copyAddress(bookmark) }
+            if !bookmark.isSecretOnly {
+                Button("Open") { model.open(bookmark) }
+                Button("Copy address") { model.copyAddress(bookmark) }
+            }
             if bookmark.hasSecret { Button("Show secret") { model.showSecret(bookmark) } }
             Divider()
             Button("Edit…") { model.sheet = .editBookmark(bookmark) }

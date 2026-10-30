@@ -47,6 +47,15 @@ it is not a developer: every message is a plain sentence.
    after every rebuild): `secrets.enc` + `secret.key` (0600), keyed by bookmark id, never in library.json. Multi-line.
    The secret window is select-to-copy only (no Copy button, Matt). `hasSecret` stays true when the text is blank
    (an import without secrets), so the row still shows the button and the editor asks for it.
+6a. **Secret-only items** (Matt, Oct 29 2026; mockup canvas UG7WKF8nLnByzTDEKbpewk — row A, editor B): a bookmark
+    may have NO address when it has a secret (`Bookmark.isSecretOnly` = blank url; `cleaned` refuses blank url +
+    no secret). It stays in the same list as every other bookmark (manual order, colors, drag, search by name/tags).
+    Its row: a key tile (`DS.key`), a plain name that opens nothing, the button titled **"Secrets-Only"**
+    (`secretButtonTitle`; "Secret" beside an address), "Secret only — no address" when there is no description; no
+    Open / Copy address in its menu; `AppModel.open` on one shows the secret. The editor opens with a segmented
+    **Web page / Secret only** picker; Secret only hides the Address row and the switch, clears the address on save,
+    and refuses a NEW secret with nothing typed (an imported blank one may be edited). Validate: no address is a
+    stop only when there is no secret either.
 7. **Export** is one JSON (`ExportFile`: tabs, directories, bookmarks, colors, maxDepth). "Include the secrets" is a
    checkbox that **defaults OFF**; on, the file holds them decrypted and the pane says so. **Validate** lists every
    problem with its place (`Transfer.validate`, stops vs notes) and changes nothing; Import validates first, then

@@ -28,6 +28,8 @@ enum Sample {
         let workTab = Folder(name: "Work", folders: [selfHosted, vendors, reading], bookmarks: [
             Bookmark(name: "Mac mini dashboard", url: "http://mini.local:8080"),
             Bookmark(name: "Tailscale admin", description: "Machines, keys and the DNS name for each tool.", url: "https://login.tailscale.com/admin", tags: ["network", "vpn"], colorId: work, hasSecret: true, secret: "auth key (expires yearly): tskey-example"),
+            Bookmark(name: "Wi-Fi password", description: "Guest network and the admin password.", url: "", tags: ["wifi"], hasSecret: true, secret: "guest: MintyFresh-2026\nadmin: example-only"),
+            Bookmark(name: "Backup passphrase", url: "", tags: ["restic", "backup"], colorId: important, hasSecret: true, secret: "restic repository: sftp:backup@mini:/srv/restic\nrepository password: correct-horse-battery-staple-91\n\nrecovery words (24):\n 1. ladder    2. velvet    3. orbit     4. canyon\n 5. mango     6. thunder   7. pixel     8. harbor\n 9. walnut   10. comet    11. fossil   12. lantern\n13. marble   14. saddle   15. tundra   16. violin\n17. anchor   18. nectar   19. quartz   20. ribbon\n21. summit   22. tiger    23. umbrella 24. zephyr\n\nTime Machine disk password:\nTM-9f3a-kelp-2c7e\n\nOff-site copy (Backblaze B2):\nkeyID: 0045a1b2c3d4e5f0000000003\napplicationKey: K004-example-only\nbucket: mini-offsite-2026\n\nEncrypted DMG (old laptop):\nPhotos-2019.dmg → \"sierra nevada 1987\""),
         ])
         let homeTab = Folder(name: "Home", folders: [
             Folder(name: "Network", description: "The home network", bookmarks: [

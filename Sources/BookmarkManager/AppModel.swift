@@ -7,6 +7,8 @@ import Combine
 
 enum MainSheet: Identifiable {
     case newBookmark(FolderPath)
+    /// the same editor with "Secret only" already picked
+    case newSecret(FolderPath)
     case editBookmark(Bookmark)
     case newFolder(FolderPath)
     case editFolder(Folder)
@@ -17,6 +19,7 @@ enum MainSheet: Identifiable {
     var id: String {
         switch self {
         case .newBookmark(let p): return "newBookmark-\(p)"
+        case .newSecret(let p): return "newSecret-\(p)"
         case .editBookmark(let b): return "editBookmark-\(b.id)"
         case .newFolder(let p): return "newFolder-\(p)"
         case .editFolder(let f): return "editFolder-\(f.id)"
@@ -206,6 +209,7 @@ final class AppModel: ObservableObject {
 
     /// Opens the bookmark in the chosen browser (Settings → General), or the Mac's default one.
     func open(_ b: Bookmark) {
+        if b.isSecretOnly { showSecret(b); return }   // nothing to open in a browser: "opening" it shows the secret
         guard let url = b.link else { notice = Notice(title: "“\(b.name)” can't be opened", message: "Its address “\(b.url)” isn't one a browser can open. Edit the bookmark and check the address."); return }
         Browsers.open(url, with: settings.browser) { [weak self] problem in self?.notice = Notice(title: "“\(b.name)” didn't open", message: problem) }
     }
@@ -296,4 +300,9 @@ struct AppSettings: Codable, Equatable {
         return s
     }
     func save() { if let data = try? JSONEncoder().encode(self) { try? data.write(to: AppSettings.url, options: .atomic) } }
+}
+
+extension Bookmark {
+    /// The button on the row: "Secret" beside an address, "Secrets-Only" when the item is nothing but a secret (Matt's wording).
+    var secretButtonTitle: String { isSecretOnly ? "Secrets-Only" : "Secret" }
 }

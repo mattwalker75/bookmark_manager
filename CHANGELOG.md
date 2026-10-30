@@ -5,6 +5,13 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
 ## [0.1.0] — unreleased
 
 ### Added
+- 2026-10-29: **Secret-only items** (Matt's pick from the tweaks canvas: row A, editor B) — a bookmark can now
+  have no address at all when it has a secret (a passphrase, the Wi-Fi password). It lives in the same list as
+  every other bookmark, so it can be ordered, colored, dragged and found by name or tag like any row. Its row
+  shows a key instead of a site icon, the name opens nothing, and the button says **Secrets-Only** (web bookmarks
+  keep **Secret**). The editor starts with a **Web page / Secret only** choice: Secret only hides the Address row
+  and the secret switch; right-click a directory → **New secret here…**. Validate no longer stops on a missing
+  address when the item has a secret.
 - 2026-10-28: **The library** — tabs › directories › sub-directories › bookmarks, with the rules Matt set: at least one
   tab always; a tab or directory is deleted only when empty (the refusal names what is still inside); directory
   levels configurable (default 2, 1–6) and never lowered below what exists; bookmarks need a name and an address

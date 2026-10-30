@@ -144,8 +144,9 @@ public enum Transfer {
             let bw = (here + [b.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "(no name)" : b.name]).joined(separator: " › ")
             if b.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { r.problems.append(Problem(place: bw, text: "This bookmark has no name.", stops: true)) }
             if !ids.insert(b.id).inserted { r.problems.append(Problem(place: bw, text: "Its id is used twice in the file.", stops: true)) }
-            if b.url.trimmingCharacters(in: .whitespaces).isEmpty { r.problems.append(Problem(place: bw, text: "This bookmark has no address.", stops: true)) }
-            else if Bookmark.link(from: b.url) == nil { r.problems.append(Problem(place: bw, text: "Its address “\(b.url)” can't be opened as it is.", stops: true)) }
+            if b.url.trimmingCharacters(in: .whitespaces).isEmpty {
+                if !b.hasSecret { r.problems.append(Problem(place: bw, text: "This bookmark has no address and no secret.", stops: true)) }
+            } else if Bookmark.link(from: b.url) == nil { r.problems.append(Problem(place: bw, text: "Its address “\(b.url)” can't be opened as it is.", stops: true)) }
             if let c = b.colorId, !colorIds.contains(c) { r.problems.append(Problem(place: bw, text: "Its color code isn't in the file; the color is cleared when importing.", stops: false)) }
             if b.hasSecret {
                 r.withSecrets += 1

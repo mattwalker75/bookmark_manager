@@ -27,6 +27,9 @@ enum DS {
     static let pad: CGFloat = 16
     static let gap: CGFloat = 12
 
+    /// the key on a secret-only item's tile (a warm gold that reads on both looks; not one of the color codes)
+    static let key = Color(red: 0.80, green: 0.62, blue: 0.14)
+
     // MARK: colours that depend on the look (light / dark), read through the environment by the views below
     /// a card's face: white in light; a slightly lifted grey in dark (surfaces come forward by getting lighter)
     static func surface(_ scheme: ColorScheme) -> Color {

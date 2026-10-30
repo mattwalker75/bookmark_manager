@@ -81,7 +81,7 @@ final class ModelsTests: XCTestCase {
         var lib = Library.fresh()
         let tab = FolderPath(tab: lib.tabs[0].id)
         XCTAssertThrowsBM(try lib.addBookmark(Bookmark(name: " ", url: "https://x.example"), in: tab), containing: "needs a name")
-        XCTAssertThrowsBM(try lib.addBookmark(Bookmark(name: "X", url: ""), in: tab), containing: "needs an address")
+        XCTAssertThrowsBM(try lib.addBookmark(Bookmark(name: "X", url: ""), in: tab), containing: "needs an address, or a secret")
         XCTAssertThrowsBM(try lib.addBookmark(Bookmark(name: "X", url: "not an address"), in: tab), containing: "doesn't look like an address")
         var b = Bookmark(name: "  Example ", description: " d ", url: " example.com/page ", tags: Bookmark.parseTags("a, b,,A ,c"), hasSecret: false, secret: "leftover")
         try lib.addBookmark(b, in: tab)
@@ -138,5 +138,48 @@ final class ModelsTests: XCTestCase {
         XCTAssertEqual(Library.levelName(1), "directory")
         XCTAssertEqual(Library.levelName(2), "sub-directory")
         XCTAssertEqual(Library.levelName(3), "level-3 directory")
+    }
+}
+
+/// Secret-only items (Matt, Oct 29 2026): a bookmark with no address at all, kept in the same list as the others.
+final class SecretOnlyTests: XCTestCase {
+    func testASecretWithoutAnAddressIsAllowedAndOnlyThen() throws {
+        var lib = Library.fresh()
+        let tab = FolderPath(tab: lib.tabs[0].id)
+        XCTAssertThrowsBM(try lib.addBookmark(Bookmark(name: "Nothing", url: "   "), in: tab), containing: "needs an address, or a secret")
+        let s = Bookmark(name: "Wi-Fi password", url: "  ", hasSecret: true, secret: "guest: MintyFresh")
+        try lib.addBookmark(s, in: tab)
+        let saved = try XCTUnwrap(lib.bookmark(s.id))
+        XCTAssertTrue(saved.isSecretOnly)
+        XCTAssertEqual(saved.url, "", "blanks are trimmed away")
+        XCTAssertNil(saved.link)
+        XCTAssertEqual(saved.secret, "guest: MintyFresh")
+        // typing an address later turns it back into an ordinary bookmark
+        var edited = saved; edited.url = "router.lan"
+        try lib.updateBookmark(edited)
+        XCTAssertFalse(try XCTUnwrap(lib.bookmark(s.id)).isSecretOnly)
+        // and taking the secret away from a secret-only item is refused (it would be an empty row)
+        var bare = saved; bare.hasSecret = false
+        XCTAssertThrowsBM(try lib.updateBookmark(bare), containing: "needs an address, or a secret")
+    }
+
+    func testSecretOnlyItemsAreFoundSavedAndExported() throws {
+        var lib = Sample.library()
+        let s = Bookmark(name: "Backup passphrase", url: "", tags: ["restic"], hasSecret: true, secret: "correct-horse")
+        try lib.addBookmark(s, in: FolderPath(tab: Sample.work))
+        XCTAssertEqual(lib.search("passphrase").map(\.name), ["Backup passphrase"])
+        XCTAssertEqual(lib.search("restic").map(\.name), ["Backup passphrase"])
+        let scratch = Scratch()
+        let store = LibraryStore(folder: scratch.url)
+        try store.save(lib)
+        let back = try XCTUnwrap(try store.load().bookmark(s.id))
+        XCTAssertTrue(back.isSecretOnly); XCTAssertEqual(back.secret, "correct-horse")
+        // an export without secrets: validation is still happy (no address is fine when it is a secret)
+        let r = Transfer.validate(try Transfer.export(lib, includeSecrets: false))
+        XCTAssertTrue(r.canImport, r.problems.map(\.text).joined(separator: " / "))
+        XCTAssertFalse(r.problems.contains { $0.text.contains("no address") })
+        // replacing from that file keeps the local secret by id
+        let (imported, _) = Transfer.apply(try Transfer.read(try Transfer.export(lib, includeSecrets: false)), to: lib, mode: .replace)
+        XCTAssertEqual(imported.bookmark(s.id)?.secret, "correct-horse")
     }
 }
