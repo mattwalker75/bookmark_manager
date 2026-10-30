@@ -17,7 +17,7 @@ struct BookmarkManagerApp: App {
                 .tint(Theme.accent)
                 .font(DS.body)
                 .frame(minWidth: 900, minHeight: 560)
-                .onAppear { model.addSampleIfAsked() }
+                .onAppear { model.addSampleIfAsked(); model.runScheduledLinkCheckIfDue() }
         }
         .defaultSize(width: 1180, height: 760)
         .commands {
@@ -34,6 +34,9 @@ struct BookmarkManagerApp: App {
                 Button("Sort This Directory by Name") { model.sortByName(model.selectedPath) }.disabled(model.isSearching)
                 Divider()
                 Button("Rename Tab…") { if let t = model.currentTab { model.sheet = .renameTab(t) } }.disabled(model.isSearching)
+                Divider()
+                Button("Check Links in This Directory…") { model.checkLinks(in: model.selectedPath) }.disabled(model.isSearching || model.linkCheckRunning)
+                Button("Check Every Address…") { model.checkLinks() }.disabled(model.linkCheckRunning)
                 Divider()
                 // the keyboard (Matt, Oct 29 2026); ↑ ↓ Return Space are handled in the window itself (KeyboardDriver)
                 Button("Copy Address") { model.copyFocusedAddress() }.keyboardShortcut("l").disabled(model.focusedBookmark.map(\.isSecretOnly) ?? true)

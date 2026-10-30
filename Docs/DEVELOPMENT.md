@@ -50,7 +50,7 @@ the .app running.
 `library.json` (`{"app":"Bookmark Manager","library":{…}}`, secrets blank) · `secrets.enc` (AES-GCM,
 `{bookmarkId: text}`) · `secret.key` (32 random bytes, 0600) · `settings.json` (appearance, accent, themes,
 activeThemeId, browser bundle id, fetchIcons, `expanded` = the directory ids whose branch is open in the tree,
-`secretHideMinutes` (0 = never), `touchIDForSecrets`) · `icons/<host>.png` (`<host>_<port>.png` for a non-standard port).
+`secretHideMinutes` (0 = never), `touchIDForSecrets`, `linkCheckDays` 0/7/30) · `linkcheck.json` (the last link check: when, how many, the problems with the address they had) · `icons/<host>.png` (`<host>_<port>.png` for a non-standard port).
 
 The export file is `{"app":"Bookmark Manager","version":1,"exportedAt":…,"secretsIncluded":bool,"library":{…}}`
 with the library exactly as in library.json (plus the secrets when included).
@@ -63,7 +63,7 @@ with the library exactly as in library.json (plus the secrets when included).
   (`newSecret` opens the bookmark editor with Secret only picked; `secret:<name prefix>` opens that bookmark's secret
   window, e.g. `secret:Backup` for the long sample secret; `keys:125,125,36` posts those key codes to the main
   window like real presses — 125 ↓, 126 ↑, 36 Return, 49 Space). Several steps run a second apart when separated
-  by `;`: `search:admin;keys:125,125`.
+  by `;`: `search:admin;keys:125,125`. `linkreport` puts a made-up link report over the sample (marks + banner), `linkreport:sheet` also opens the sheet, `linkcheck` runs a real check.
 
 Screenshots: run `.build/debug/BookmarkManager` with those variables, then `screencapture -x -l <window id>`
 (after `caffeinate -u -t 1`; the window ids from `CGWindowListCopyWindowInfo`, owner `BookmarkManager`).

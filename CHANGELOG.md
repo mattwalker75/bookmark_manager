@@ -12,6 +12,12 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   keep **Secret**). The editor starts with a **Web page / Secret only** choice: Secret only hides the Address row
   and the secret switch; right-click a directory → **New secret here…**. Validate no longer stops on a missing
   address when the item has a secret.
+- 2026-10-29: **Check links** (Matt's pick: option B) — Settings → General → Check every address…, or right-click a
+  directory → Check links in this directory…: each address is asked for once (HEAD, then GET when a server
+  dislikes HEAD), five at a time, eight seconds each. One sheet lists the problems with their place: gone (404/410),
+  moved (a permanent redirect — Use new address takes it), didn't answer (no such site, timed out, server error,
+  login or robot block). Problem rows keep a red mark and a red line until the next check or an edit. Optional
+  schedule, off by default: once a week or month, run quietly after launch with a banner above the list.
 - 2026-10-29: **A browser per bookmark** (Matt's pick: editor only) — an "Opens in" row in the bookmark editor, "The
   browser from Settings" unless you choose one of the installed browsers for that bookmark. Nothing changes on
   the row. A browser removed later falls back to the Settings one with a sentence. Exports carry it.

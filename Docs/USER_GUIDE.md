@@ -99,6 +99,19 @@ hidden until you ask for it.
 - **⌘1 … ⌘9** switch to that tab (the Tabs menu lists them); **⌃Tab** and **⌃⇧Tab** go to the next and previous tab.
 - As before: ⌘N new bookmark, ⇧⌘N new directory, ⌘T new tab, ⌘F search, ⌘E edit the open directory.
 
+## Checking links
+- Settings → General → **Check every address…** asks each bookmark's address once, a few at a time, and lists
+  the ones that didn't answer as expected, each with where it lives: **gone** (the page is not there any more),
+  **moved** (the site says it has a new address — *Use new address* takes it), and **didn't answer** (no such site,
+  timed out, a server error, or a login page or robot block — those can still work fine in your browser). Show in
+  place and Edit… are right there.
+- Right-click a directory → **Check links in this directory…** does the same for just that directory.
+- After a check, a problem bookmark wears a small red mark on its icon and a red line under its name saying what
+  happened and when. The mark goes when you edit the address or the next check finds it fine.
+- **Check all addresses on their own** (Settings → General) is off unless you turn it on: once a week or once a
+  month, the app checks quietly a few seconds after launch and puts a line above the list when something didn't
+  answer. Nothing else in the app visits a bookmark's full address.
+
 ## Color codes
 - Settings → **Color codes**: each color has a name — *Important*, *Work*, *Personal*, *Reference* to start.
   Change a color (click the swatch) or its name, add more (up to 10), remove one. Removing a color asks first and

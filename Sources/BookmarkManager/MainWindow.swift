@@ -16,7 +16,8 @@ struct MainWindow: View {
             HStack(spacing: 0) {
                 FolderTree().frame(width: 272)
                 Divider()
-                Group {
+                VStack(spacing: 0) {
+                    if let b = model.linkBanner { LinkBanner(report: b); Divider() }
                     if model.isSearching { SearchResults() }
                     else if model.currentFolder != nil { FolderDetail(path: model.selectedPath) }
                     else { Text("Choose a tab").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity) }
@@ -44,6 +45,7 @@ struct MainWindow: View {
             case .newTab: TabNameSheet(tab: nil)
             case .renameTab(let t): TabNameSheet(tab: t)
             case .move(let item): MoveSheet(item: item)
+            case .linkReport: LinkReportSheet()
             }
         }
         .alert(item: $model.notice) { n in Alert(title: Text(n.title), message: Text(n.message), dismissButton: .default(Text("OK"))) }
@@ -74,6 +76,14 @@ struct MainWindow: View {
             case "newTab": model.sheet = .newTab
             case "move": if let b { model.sheet = .move(.bookmark(b.id)) }
             case "secret": if let b { model.showSecret(b) }
+            case "linkcheck": model.checkLinks()
+            case "linkreport", "linkreport:sheet":
+                // a made-up report over the sample, so the marks, the banner and the sheet can be looked at without the network
+                func r(_ name: String, _ v: LinkVerdict) -> LinkResult? { model.library.allBookmarks.first { $0.name == name }.map { LinkResult(bookmarkId: $0.id, url: $0.url, verdict: v) } }
+                let problems = [r("Router status", .gone(code: 404)), r("GitHub organization settings", .gone(code: 410)), r("Swift forums", .moved(to: "https://forums.swift.org/latest")),
+                                r("Mac mini dashboard", .unreachable("Nothing answering there")), r("UniFi controller", .unreachable("Timed out")), r("Bank", .refused(code: 403))].compactMap { $0 }
+                model.linkReport = LinkReport(checkedAt: Date().addingTimeInterval(-86_400 * 2), checked: model.library.allBookmarks.count, problems: problems, automatic: true, seconds: 41)
+                if sheet.hasSuffix(":sheet") { model.sheet = .linkReport }
             default:
                 if sheet.hasPrefix("secret:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(7))) }) { model.showSecret(b) }
                 if sheet.hasPrefix("search:") { model.query = String(sheet.dropFirst(7)) }
@@ -377,6 +387,8 @@ struct TreeRow: View {
             Button("New bookmark here…") { model.sheet = .newBookmark(path) }
             Button("New secret here…") { model.sheet = .newSecret(path) }
             Divider()
+            Button(depth == 0 ? "Check links in this tab…" : "Check links in this directory…") { model.checkLinks(in: path) }.disabled(model.linkCheckRunning)
+            Divider()
             Button(depth == 0 ? "Rename tab…" : "Edit…") { model.sheet = depth == 0 ? .renameTab(folder) : .editFolder(folder) }
             if depth > 0 { Button("Move to…") { model.sheet = .move(.folder(folder.id)) } }
             Button("Sort by name") { model.sortByName(path) }
@@ -550,6 +562,7 @@ struct SubfolderRow: View {
             Button("Open") { model.select(path) }
             Button("Edit…") { model.sheet = .editFolder(folder) }
             Button("Move to…") { model.sheet = .move(.folder(folder.id)) }
+            Button("Check links in this directory…") { model.checkLinks(in: path) }.disabled(model.linkCheckRunning)
             Divider()
             Button("Delete…", role: .destructive) { if folder.isEmpty { confirmDelete = true } else { model.deleteFolder(folder.id) } }
         }
@@ -587,9 +600,20 @@ struct BookmarkRow: View {
     @State private var confirmDelete = false
 
     var body: some View {
+        let problem = model.linkProblems[bookmark.id]
         HStack(alignment: .center, spacing: 12) {
-            if bookmark.isSecretOnly { IconTile(systemName: "key.fill", color: DS.key).accessibilityHidden(true) }
-            else { SiteIcon(address: bookmark.url) }
+            Group {
+                if bookmark.isSecretOnly { IconTile(systemName: "key.fill", color: DS.key).accessibilityHidden(true) }
+                else { SiteIcon(address: bookmark.url) }
+            }
+            .overlay(alignment: .topTrailing) {
+                if problem != nil {
+                    // the link check's mark: it stays until the next check finds the address fine, or the address is edited
+                    Text("!").font(.system(size: 10, weight: .bold)).foregroundStyle(.white).frame(width: 15, height: 15)
+                        .background(Theme.problem, in: Circle()).overlay(Circle().strokeBorder(Color(nsColor: .controlBackgroundColor), lineWidth: 1.5))
+                        .offset(x: 5, y: -5).accessibilityHidden(true)
+                }
+            }
             VStack(alignment: .leading, spacing: 2) {
                 if bookmark.isSecretOnly {
                     // nothing to open: the name is plain text, the Secrets-Only button is the thing to click
@@ -608,6 +632,10 @@ struct BookmarkRow: View {
                 if let place { Text(place).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1) }
                 else if !bookmark.description.isEmpty { Text(bookmark.description).font(DS.secondary).foregroundStyle(.secondary).lineLimit(2) }
                 else if bookmark.isSecretOnly { Text("Secret only — no address").font(DS.secondary).foregroundStyle(.secondary) }
+                if let problem, let when = model.linkReport?.checkedAt {
+                    Text("\(problem.verdict.text) when checked \(when.formatted(date: .abbreviated, time: .omitted))").font(DS.secondary).foregroundStyle(Theme.problem).lineLimit(1)
+                        .accessibilityLabel("Link check: \(problem.verdict.text)")
+                }
             }
             Spacer(minLength: 8)
             if bookmark.hasSecret {

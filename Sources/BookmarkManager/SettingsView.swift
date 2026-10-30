@@ -25,6 +25,7 @@ struct GeneralPane: View {
     @State private var browsers: [Browser] = []
     @State private var depth = 2
     @State private var depthProblem: String?
+    @State private var showLinkReport = false
 
     var body: some View {
         Form {
@@ -68,6 +69,20 @@ struct GeneralPane: View {
                      : "This Mac has no Touch ID and no login password to check against, so the option can't do anything here.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
+            Section("Links") {
+                HStack(spacing: 10) {
+                    Button("Check every address…") { model.checkLinks(inMainWindow: false); showLinkReport = true }.disabled(model.linkCheckRunning)
+                    if model.linkCheckRunning { ProgressView().controlSize(.small) }
+                    Spacer()
+                    if model.linkReport != nil { Button("Last results…") { showLinkReport = true } }
+                }
+                Text(lastCheckText).font(DS.secondary).foregroundStyle(.secondary)
+                Picker("Check all addresses on their own", selection: $model.settings.linkCheckDays) {
+                    Text("Never").tag(0); Text("Once a week").tag(7); Text("Once a month").tag(30)
+                }
+                Text("Each address is asked for once, a few at a time, and only when you ask — by this button, by right-click → Check links in this directory, or by this schedule, which runs quietly a few seconds after launch and puts a line above the list when something didn't answer. Problem rows keep a red mark until the next check.")
+                    .font(DS.secondary).foregroundStyle(.secondary)
+            }
             Section {
                 Toggle("Fetch site icons", isOn: $model.settings.fetchIcons)
                 Text("Each site's icon is fetched once from its address and kept on this Mac; a site without one shows the link glyph. Turned off, nothing is fetched (icons already here still show).")
@@ -86,6 +101,12 @@ struct GeneralPane: View {
         .formStyle(.grouped)
         .onAppear { browsers = Browsers.installed(); depth = model.library.maxDepth }
         .onChange(of: model.library.maxDepth) { _, d in depth = d }
+        .sheet(isPresented: $showLinkReport) { LinkReportSheet().environmentObject(model) }
+    }
+
+    private var lastCheckText: String {
+        guard let r = model.linkReport else { return "No check has run yet." }
+        return "Last checked \(r.checkedAt.formatted(date: .abbreviated, time: .shortened)): \(r.summary.lowercased())."
     }
 
     private func levelsLabel(_ d: Int) -> String {

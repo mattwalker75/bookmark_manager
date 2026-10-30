@@ -94,6 +94,12 @@ it is not a developer: every message is a plain sentence.
     at most `IconCache.atOnce` (4) fetches run at once, the rest queue; the editor's icon is cache-only
     (`SiteIcon(fetch: false)`) so half-typed hosts are never looked up; an import warms nothing (rows fetch lazily);
     `SiteIcon` observes `IconCache` directly (an arriving icon redraws only the rows that show it).
+    **The link check is the ONE deliberate full-address visit** (Matt, Oct 29 2026, mockup B): `LinkChecker` HEAD then
+    GET (on 400/403/405/501), 5 at once, 8 s each, any certificate, first permanent redirect remembered; verdicts
+    `LinkVerdict` (gone / moved / refused / failed / unreachable) kept in `linkcheck.json`; a row's mark applies only
+    while its url is unchanged; a one-directory check merges into the old report; it runs ONLY by the Settings
+    button, the directory menu, the Bookmarks menu, or the schedule `linkCheckDays` (default 0 = never; a due check
+    runs 5 s after launch, `automatic`, and shows a banner instead of the sheet).
 11. **Files are never lost:** a damaged library.json / unreadable secrets are moved aside (`*.unreadable-<date>`) and
     reported; a damaged library.json takes a COPY of secrets.enc with it (review: the next save would prune them).
     Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json, then the prune — a failed library

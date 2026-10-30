@@ -16,8 +16,11 @@ enum MainSheet: Identifiable {
     case renameTab(Folder)
     /// Move to…: choose where a bookmark or directory goes
     case move(DragItem)
+    /// the link check: its progress, then its problems
+    case linkReport
     var id: String {
         switch self {
+        case .linkReport: return "linkReport"
         case .newBookmark(let p): return "newBookmark-\(p)"
         case .newSecret(let p): return "newSecret-\(p)"
         case .editBookmark(let b): return "editBookmark-\(b.id)"
@@ -53,6 +56,10 @@ final class AppModel: ObservableObject {
     @Published var focusSearch = 0
     @Published var settings = AppSettings.load() { didSet { guard settings != oldValue else { return }; settings.save(); Theme.apply(settings); icons.enabled = settings.fetchIcons } }
     @Published var settingsTab = "general"
+    /// the last link check's outcome (kept on disk), and the one running now
+    @Published var linkReport: LinkReport?
+    @Published var linkProgress: LinkCheckProgress?
+    private var linkTask: Task<Void, Never>?
     @Published var previewLook: Appearance?
     var lookInForce: Appearance { previewLook ?? settings.effectiveAppearance }
 
@@ -78,6 +85,76 @@ final class AppModel: ObservableObject {
         // directories that no longer exist drop out of the remembered tree state
         let known = Set(lib.allFolders.map(\.id))
         if !settings.expanded.isSubset(of: known) { settings.expanded.formIntersection(known) }
+        linkReport = LinkReport.load(from: store.folder)
+    }
+
+    // MARK: checking links (Matt, Oct 29 2026)
+
+    /// The marks the rows wear: the last check's problems, for bookmarks whose address hasn't changed since.
+    var linkProblems: [UUID: LinkResult] {
+        guard let r = linkReport else { return [:] }
+        var out: [UUID: LinkResult] = [:]
+        for p in r.problems { if let b = library.bookmark(p.bookmarkId), b.url == p.url { out[b.id] = p } }
+        return out
+    }
+    var linkCheckRunning: Bool { linkProgress != nil }
+    /// The banner above the list: an automatic check found problems and nobody has looked yet.
+    var linkBanner: LinkReport? { guard let r = linkReport, r.automatic, !r.bannerDismissed, !linkProblems.isEmpty else { return nil }; return r }
+    /// Whether the schedule says a check is due now.
+    func linkCheckDue(now: Date = Date()) -> Bool {
+        guard settings.linkCheckDays > 0 else { return false }
+        guard let last = linkReport?.checkedAt else { return true }
+        return now.timeIntervalSince(last) >= TimeInterval(settings.linkCheckDays) * 86_400
+    }
+
+    /// Checks every address (or one directory's). `automatic` = run by the schedule: no sheet, a banner instead.
+    /// `inMainWindow` = false when Settings shows the sheet itself.
+    func checkLinks(in path: FolderPath? = nil, automatic: Bool = false, inMainWindow: Bool = true) {
+        guard linkTask == nil else { if !automatic, inMainWindow { sheet = .linkReport }; return }
+        let bookmarks = path.flatMap { library.folder(at: $0) }?.allBookmarks ?? library.allBookmarks
+        let items = bookmarks.compactMap { b in b.link.map { (id: b.id, url: $0) } }.filter { ["http", "https"].contains($0.url.scheme ?? "") }
+        let scope = path.map { placeName($0) }
+        linkProgress = LinkCheckProgress(total: items.count)
+        if !automatic, inMainWindow { sheet = .linkReport }
+        let started = Date()
+        linkTask = Task { [weak self] in
+            let found = await LinkChecker.check(items) { [weak self] n in self?.linkProgress?.done = n }
+            guard let self else { return }
+            let cancelled = Task.isCancelled
+            var report = LinkReport(checkedAt: Date(), checked: found.count, problems: found.filter(\.verdict.isProblem), scope: scope, automatic: automatic, seconds: Date().timeIntervalSince(started))
+            if scope != nil, let old = linkReport {
+                // one directory checked: the other directories' marks stay as they were
+                let ids = Set(items.map(\.id))
+                report.problems += old.problems.filter { !ids.contains($0.bookmarkId) }
+                report.scope = nil
+            }
+            if !cancelled || !found.isEmpty { linkReport = report; report.save(in: store.folder) }
+            linkProgress = nil
+            linkTask = nil
+        }
+    }
+    func cancelLinkCheck() { linkTask?.cancel() }
+    func dismissLinkBanner() { linkReport?.bannerDismissed = true; linkReport?.save(in: store.folder) }
+    /// "Use new address" on a moved bookmark.
+    func useNewAddress(_ r: LinkResult) {
+        guard case .moved(let to) = r.verdict, var b = library.bookmark(r.bookmarkId) else { return }
+        b.url = to
+        updateBookmark(b)
+        linkReport?.problems.removeAll { $0.bookmarkId == r.bookmarkId }
+        linkReport?.save(in: store.folder)
+    }
+    /// Show in place from the link sheet: the bookmark's directory, with its row marked.
+    func reveal(bookmark id: UUID) {
+        guard let p = library.location(ofBookmark: id) else { return }
+        query = ""; select(p); flash(id)
+    }
+    /// The schedule: a quiet check a few seconds after launch when one is due.
+    func runScheduledLinkCheckIfDue() {
+        guard linkCheckDue() else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self, linkCheckDue() else { return }
+            checkLinks(automatic: true)
+        }
     }
 
     // MARK: the folder tree's open and closed branches (Matt, Oct 29 2026: chevrons, remembered)
@@ -375,6 +452,8 @@ struct AppSettings: Codable, Equatable {
     var secretHideMinutes = 5
     /// Touch ID (or the Mac's password) before a secret is shown
     var touchIDForSecrets = false
+    /// check every address on its own every this many days; 0 = never (Matt, Oct 29 2026)
+    var linkCheckDays = 0
 
     var activeTheme: CustomTheme? { activeThemeId.flatMap { id in themes.first { $0.id == id } } }
     var effectiveAppearance: Appearance { activeTheme?.look ?? appearance }
@@ -392,6 +471,7 @@ struct AppSettings: Codable, Equatable {
         expanded = try c.decodeIfPresent(Set<UUID>.self, forKey: .expanded) ?? []
         secretHideMinutes = max(0, try c.decodeIfPresent(Int.self, forKey: .secretHideMinutes) ?? 5)
         touchIDForSecrets = try c.decodeIfPresent(Bool.self, forKey: .touchIDForSecrets) ?? false
+        linkCheckDays = max(0, try c.decodeIfPresent(Int.self, forKey: .linkCheckDays) ?? 0)
     }
 
     static var url: URL { Home.folder().appendingPathComponent("settings.json") }
