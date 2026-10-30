@@ -97,6 +97,20 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <!-- site icons are fetched from the bookmarks' own addresses, often plain http:// on a Tailscale or LAN name -->
   <!-- only NSAllowsArbitraryLoads: with NSAllowsLocalNetworking beside it macOS ignores it (App Starter, reproduced) -->
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+  <!-- the backup files: so the Finder calls them by name and the open panel can filter on them -->
+  <key>UTExportedTypeDeclarations</key>
+  <array><dict>
+    <key>UTTypeIdentifier</key><string>$BUNDLE_ID.backup</string>
+    <key>UTTypeDescription</key><string>Bookmark Manager backup</string>
+    <key>UTTypeConformsTo</key><array><string>public.json</string></array>
+    <key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>bmbackup</string></array></dict>
+  </dict></array>
+  <key>CFBundleDocumentTypes</key>
+  <array><dict>
+    <key>CFBundleTypeName</key><string>Bookmark Manager backup</string>
+    <key>LSItemContentTypes</key><array><string>$BUNDLE_ID.backup</string></array>
+    <key>CFBundleTypeRole</key><string>None</string>
+  </dict></array>
 </dict>
 </plist>
 PLIST

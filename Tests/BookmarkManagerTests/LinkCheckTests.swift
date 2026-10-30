@@ -114,7 +114,10 @@ final class TinyHTTP: @unchecked Sendable {
     private let queue = DispatchQueue(label: "tinyhttp")
 
     init(_ respond: @escaping @Sendable (String, String) -> String) throws {
-        listener = try NWListener(using: .tcp, on: .any)
+        // loopback only: nothing listens on a real interface (and no firewall prompt for xctest)
+        let params = NWParameters.tcp
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: .any)
+        listener = try NWListener(using: params)
         let ready = DispatchSemaphore(value: 0)
         listener.stateUpdateHandler = { if case .ready = $0 { ready.signal() } }
         listener.newConnectionHandler = { conn in

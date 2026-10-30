@@ -21,7 +21,7 @@ struct BookmarkManagerApp: App {
                     model.addSampleIfAsked()
                     model.runScheduledLinkCheckIfDue()
                     model.backupAtLaunchIfDue()
-                    AppDelegate.beforeQuit = { [weak model] in model?.backupOnQuit() }
+                    AppDelegate.beforeQuit = { model.backupOnQuit() }
                 }
         }
         .defaultSize(width: 1180, height: 760)

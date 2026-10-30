@@ -268,6 +268,7 @@ public final class BackupStore: @unchecked Sendable {
     /// Deletes the oldest backups beyond `keep`, never a kept one or an unreadable file. Returns what went.
     @discardableResult
     public func prune(keep: Int) -> [URL] {
+        let keep = max(1, keep)   // never every unkept backup, whatever a hand-edited settings file says
         let unkept = list().filter { $0.readable && !$0.kept }
         guard unkept.count > keep else { return [] }
         var gone: [URL] = []

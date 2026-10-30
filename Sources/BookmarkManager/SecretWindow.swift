@@ -44,7 +44,10 @@ enum SecretWindows {
         let minutes = holder.model?.settings.secretHideMinutes ?? 0
         guard minutes > 0 else { return }
         holder.timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(minutes) * 60, repeats: false) { _ in
-            MainActor.assumeIsolated { SecretWindows.close(id) }
+            MainActor.assumeIsolated {
+                // the window you are working in stays (review 2); one you left behind goes
+                if windows[id]?.isKeyWindow == true { arm(id) } else { close(id) }
+            }
         }
     }
 

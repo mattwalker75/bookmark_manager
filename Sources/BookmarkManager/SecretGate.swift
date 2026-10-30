@@ -20,7 +20,7 @@ enum SecretGate {
         let context = LAContext()
         var why: NSError?
         guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &why) else {
-            done(false, "This Mac can't check who you are right now (\(why?.localizedDescription ?? "no Touch ID and no password")). Turn off “Ask for Touch ID” in Settings → General to show secrets without it.")
+            done(false, "This Mac can't check who you are right now: \(why?.localizedDescription ?? "there is no Touch ID and no login password to check against"). Turn off “Ask for Touch ID before showing a secret” in Settings → General to show secrets without it.")
             return
         }
         context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { ok, error in

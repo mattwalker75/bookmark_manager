@@ -32,7 +32,7 @@ enum LinkVerdict: Codable, Equatable {
         case .fine: return "Fine"
         case .gone(let c): return c == 410 ? "Page gone for good (410)" : "Page gone (404)"
         case .moved: return "Moved for good"
-        case .refused(let c): return c == 401 ? "Needs a login (401)" : c == 429 ? "Asked to slow down (429)" : "Refused robots (403)"
+        case .refused(let c): return c == 401 ? "Needs a login (401)" : c == 429 ? "Asked to slow down (429)" : "Turned away (403)"
         case .failed(let c): return "Server error (\(c))"
         case .unreachable(let why): return why
         }

@@ -87,7 +87,15 @@ final class AppModel: ObservableObject {
         let known = Set(lib.allFolders.map(\.id))
         if !settings.expanded.isSubset(of: known) { settings.expanded.formIntersection(known) }
         linkReport = LinkReport.load(from: store.folder)
+        // the daily backup also comes while the app stays open for days (review 2): looked at once an hour
+        if !Home.isTesting {
+            backupTimer = Timer.scheduledTimer(withTimeInterval: 3_600, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.backupAtLaunchIfDue() }
+            }
+        }
     }
+    private var backupTimer: Timer?
+    deinit { backupTimer?.invalidate() }
 
     // MARK: checking links (Matt, Oct 29 2026)
 
@@ -124,9 +132,12 @@ final class AppModel: ObservableObject {
             let cancelled = Task.isCancelled
             var report = LinkReport(checkedAt: Date(), checked: found.count, problems: found.filter(\.verdict.isProblem), scope: scope, automatic: automatic, seconds: Date().timeIntervalSince(started))
             if scope != nil, let old = linkReport {
-                // one directory checked: the other directories' marks stay as they were
+                // one directory checked: the other directories' marks stay as they were, and count as checked
+                // (review 2: otherwise the summary could read "5 of 2 addresses")
                 let ids = Set(items.map(\.id))
-                report.problems += old.problems.filter { !ids.contains($0.bookmarkId) }
+                let elsewhere = old.problems.filter { !ids.contains($0.bookmarkId) }
+                report.problems += elsewhere
+                report.checked += elsewhere.count
                 report.scope = nil
             }
             if !cancelled || !found.isEmpty { linkReport = report; report.save(in: store.folder) }
@@ -349,7 +360,7 @@ final class AppModel: ObservableObject {
         var key: SymmetricKey?
         var how = "this Mac's key"
         if let keyFile {
-            guard let d = try? Data(contentsOf: keyFile), d.count == 32 else { return .failure(BMError("\(keyFile.lastPathComponent) isn't a Bookmark Manager key file (it should be exactly 32 bytes).")) }
+            guard let d = try? Data(contentsOf: keyFile), d.count == 32 else { return .failure(BMError("\(keyFile.lastPathComponent) isn't a Bookmark Manager key file.")) }
             key = SymmetricKey(data: d); how = "the key file \(keyFile.lastPathComponent)"
         } else if let passphrase {
             guard let f = try? Backup.read(data), let wrap = f.passphrase else { return .failure(BMError("This backup has no passphrase on it; it needs the key file.")) }
@@ -465,9 +476,12 @@ final class AppModel: ObservableObject {
         if b.isSecretOnly { showSecret(b); return }   // nothing to open in a browser: "opening" it shows the secret
         guard let url = b.link else { notice = Notice(title: "“\(b.name)” can't be opened", message: "Its address “\(b.url)” isn't one a browser can open. Edit the bookmark and check the address."); return }
         let choice = browserChoice(for: b) { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil }
-        if let note = choice.note { notice = Notice(title: "“\(b.name)” opened in the usual browser", message: note) }
+        // said once per bookmark per launch (review 2: it used to say it on every click)
+        if let note = choice.note, toldMissingBrowser.insert(b.id).inserted { notice = Notice(title: "“\(b.name)” opened in the browser from Settings", message: note) }
         Browsers.open(url, with: choice.id) { [weak self] problem in self?.notice = Notice(title: "“\(b.name)” didn't open", message: problem) }
     }
+
+    private var toldMissingBrowser = Set<UUID>()
 
     /// The browser a bookmark opens in: its own when it has one that is installed, else the one from Settings
     /// (with a sentence when its own has gone missing).
@@ -575,27 +589,30 @@ struct AppSettings: Codable, Equatable {
     var effectiveAppearance: Appearance { activeTheme?.look ?? appearance }
 
     init() {}
-    // every field optional on disk, so a settings file from an older version still loads
+    // every field optional on disk, so a settings file from an older version still loads — and every field forgives
+    // its own bad value (review 2: one wrongly typed value used to make the whole file unreadable, which reset everything)
     init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
-        appearance = try c.decodeIfPresent(Appearance.self, forKey: .appearance) ?? .system
-        accent = try c.decodeIfPresent(ThemeColor.self, forKey: .accent) ?? .blue
-        themes = try c.decodeIfPresent([CustomTheme].self, forKey: .themes) ?? []
-        activeThemeId = try c.decodeIfPresent(UUID.self, forKey: .activeThemeId)
-        browser = try c.decodeIfPresent(String.self, forKey: .browser)
-        fetchIcons = try c.decodeIfPresent(Bool.self, forKey: .fetchIcons) ?? true
-        expanded = try c.decodeIfPresent(Set<UUID>.self, forKey: .expanded) ?? []
-        secretHideMinutes = max(0, try c.decodeIfPresent(Int.self, forKey: .secretHideMinutes) ?? 5)
-        touchIDForSecrets = try c.decodeIfPresent(Bool.self, forKey: .touchIDForSecrets) ?? false
-        linkCheckDays = max(0, try c.decodeIfPresent(Int.self, forKey: .linkCheckDays) ?? 0)
-        backupsEnabled = try c.decodeIfPresent(Bool.self, forKey: .backupsEnabled) ?? true
-        backupFolder = try c.decodeIfPresent(String.self, forKey: .backupFolder).flatMap { $0.isEmpty ? nil : $0 }
-        backupWhen = (try? c.decodeIfPresent(BackupWhen.self, forKey: .backupWhen)) ?? .dailyAndQuit
-        backupKeep = max(1, try c.decodeIfPresent(Int.self, forKey: .backupKeep) ?? 14)
-        backupPassphrase = try? c.decodeIfPresent(PassphraseWrap.self, forKey: .backupPassphrase)
-        backupSecretsPlain = try c.decodeIfPresent(Bool.self, forKey: .backupSecretsPlain) ?? false
-        lastBackupDigest = try c.decodeIfPresent(String.self, forKey: .lastBackupDigest)
-        lastBackupAt = try? c.decodeIfPresent(Date.self, forKey: .lastBackupAt)
+        func read<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T { (try? c.decodeIfPresent(T.self, forKey: key)) ?? fallback }
+        func readOptional<T: Decodable>(_ key: CodingKeys) -> T? { try? c.decodeIfPresent(T.self, forKey: key) }
+        appearance = read(.appearance, .system)
+        accent = read(.accent, .blue)
+        themes = read(.themes, [])
+        activeThemeId = readOptional(.activeThemeId)
+        browser = (readOptional(.browser) as String?).flatMap { $0.isEmpty ? nil : $0 }
+        fetchIcons = read(.fetchIcons, true)
+        expanded = read(.expanded, [])
+        secretHideMinutes = max(0, read(.secretHideMinutes, 5))
+        touchIDForSecrets = read(.touchIDForSecrets, false)
+        linkCheckDays = max(0, read(.linkCheckDays, 0))
+        backupsEnabled = read(.backupsEnabled, true)
+        backupFolder = (readOptional(.backupFolder) as String?).flatMap { $0.isEmpty ? nil : $0 }
+        backupWhen = read(.backupWhen, .dailyAndQuit)
+        backupKeep = max(1, read(.backupKeep, 14))
+        backupPassphrase = readOptional(.backupPassphrase)
+        backupSecretsPlain = read(.backupSecretsPlain, false)
+        lastBackupDigest = readOptional(.lastBackupDigest)
+        lastBackupAt = readOptional(.lastBackupAt)
     }
 
     static var url: URL { Home.folder().appendingPathComponent("settings.json") }

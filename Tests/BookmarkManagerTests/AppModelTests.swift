@@ -226,11 +226,12 @@ final class AppReviewTests: XCTestCase {
         cache.enabled = true
         XCTAssertNil(cache.image(for: "https://g", fetch: false)); XCTAssertNil(cache.image(for: "https://github.co", fetch: false))
         XCTAssertEqual(cache.pending, 0, "a half-typed address is never looked up")
-        for i in 0..<50 { _ = cache.image(for: "https://host\(i).invalid/") }
+        // fifty sites that are all this Mac (closed ports on 127.0.0.1): nothing leaves the machine, every fetch fails fast
+        for i in 0..<50 { _ = cache.image(for: "http://127.0.0.1:\(2000 + i)/") }
         XCTAssertEqual(cache.pending, 50)
         XCTAssertLessThanOrEqual(cache.pending - 46, 4, "at most four in flight")
         cache.enabled = false
-        _ = cache.image(for: "https://another.invalid/")
+        _ = cache.image(for: "http://127.0.0.1:1999/")
         XCTAssertEqual(cache.pending, 50, "fetching off: nothing new is queued")
     }
 
@@ -386,6 +387,8 @@ final class KeyboardTests: XCTestCase {
         m.selectNextTab(-1); XCTAssertEqual(m.currentTab?.name, names[names.count - 1], "and back")
         let secretOnly = try XCTUnwrap(m.library.allBookmarks.first { $0.isSecretOnly })
         let web = try XCTUnwrap(m.library.allBookmarks.first { !$0.isSecretOnly })
+        let clipboardBefore = NSPasteboard.general.string(forType: .string)   // Matt's clipboard is put back after
+        defer { NSPasteboard.general.clearContents(); if let c = clipboardBefore { NSPasteboard.general.setString(c, forType: .string) } }
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString("before", forType: .string)
         m.focusId = secretOnly.id; m.copyFocusedAddress()
         XCTAssertEqual(NSPasteboard.general.string(forType: .string), "before", "a secret-only item has no address to copy")
