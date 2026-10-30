@@ -2,9 +2,11 @@
 
 All notable changes to Bookmark Manager (Keep a Changelog style; dates are when the change was made).
 
-## [0.1.0] — unreleased
+## [0.5.0] — 2026-10-30
 
 ### Added
+- 2026-10-30: **The new address of a moved link is shown** in full under its row in the link sheet (selectable;
+  right-click to copy), with *Open new…* to look at it in the browser before *Use new address* takes it.
 - 2026-10-29: **Secret-only items** (Matt's pick from the tweaks canvas: row A, editor B) — a bookmark can now
   have no address at all when it has a secret (a passphrase, the Wi-Fi password). It lives in the same list as
   every other bookmark, so it can be ordered, colored, dragged and found by name or tag like any row. Its row
