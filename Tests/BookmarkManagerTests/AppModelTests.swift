@@ -250,3 +250,27 @@ final class AppReviewTests: XCTestCase {
         }
     }
 }
+
+/// The tweaks of Oct 29 2026.
+@MainActor
+final class TweakTests: XCTestCase {
+    func testSecretWindowFitsItsTextBetweenTheFloorAndTheCap() {
+        let screen = NSSize(width: 1440, height: 900)
+        let one = SecretWindows.fittedSize(for: "pin: 1234", screen: screen)
+        XCTAssertEqual(one, SecretWindows.floor, "one short line: the floor")
+        let nine = SecretWindows.fittedSize(for: (1...9).map { "line \($0): a fairly long line of secret text that is wider than the floor" }.joined(separator: "\n"), screen: screen)
+        XCTAssertGreaterThan(nine.width, SecretWindows.floor.width)
+        XCTAssertGreaterThan(nine.height, SecretWindows.floor.height)
+        XCTAssertLessThan(nine.width, 1440 * 0.6); XCTAssertLessThan(nine.height, 900 * 0.7)
+        let forty = SecretWindows.fittedSize(for: Array(repeating: "x", count: 40).joined(separator: "\n"), screen: screen)
+        XCTAssertEqual(forty.height, 630, "capped at 70% of the screen's height")
+        XCTAssertEqual(forty.width, SecretWindows.floor.width)
+        let wide = SecretWindows.fittedSize(for: String(repeating: "w", count: 400), screen: screen)
+        XCTAssertEqual(wide.width, 864, "capped at 60% of the screen's width")
+        let none = SecretWindows.fittedSize(for: "", screen: screen)
+        XCTAssertEqual(none.height, SecretWindows.floor.height, "the 'no secret yet' line is one line tall")
+        XCTAssertGreaterThan(none.width, SecretWindows.floor.width, "and wide enough to read in one line")
+        // a tiny screen never pushes the cap under the floor
+        XCTAssertEqual(SecretWindows.fittedSize(for: forty.debugDescription, screen: NSSize(width: 300, height: 200)), SecretWindows.floor)
+    }
+}

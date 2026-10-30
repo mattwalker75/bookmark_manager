@@ -67,6 +67,7 @@ struct MainWindow: View {
             case "move": if let b { model.sheet = .move(.bookmark(b.id)) }
             case "secret": if let b { model.showSecret(b) }
             default:
+                if sheet.hasPrefix("secret:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(7))) }) { model.showSecret(b) }
                 if sheet.hasPrefix("search:") { model.query = String(sheet.dropFirst(7)) }
                 if sheet.hasPrefix("settings") {
                     model.settingsTab = sheet.split(separator: ":").dropFirst().first.map(String.init) ?? "general"

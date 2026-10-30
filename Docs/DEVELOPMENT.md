@@ -59,7 +59,8 @@ with the library exactly as in library.json (plus the secrets when included).
 - `BOOKMARKMANAGER_SAMPLE=1` — with an empty home, fill in example tabs and bookmarks (`Sample.swift`).
 - `BOOKMARKMANAGER_AUTOSHEET=newBookmark | editBookmark | newFolder | editFolder | newTab | move | secret |
   search:<text> | settings[:general|colors|appearance|transfer]` — open that sheet / window a second after launch
-  (`newSecret` opens the bookmark editor with Secret only picked).
+  (`newSecret` opens the bookmark editor with Secret only picked; `secret:<name prefix>` opens that bookmark's secret
+  window, e.g. `secret:Backup` for the long sample secret).
 
 Screenshots: run `.build/debug/BookmarkManager` with those variables, then `screencapture -x -l <window id>`
 (after `caffeinate -u -t 1`; the window ids from `CGWindowListCopyWindowInfo`, owner `BookmarkManager`).

@@ -52,7 +52,10 @@ hidden until you ask for it.
 - Deleting a bookmark asks first. Its secret goes with it.
 
 ## Secrets
-- Click **Secret** on a row (or in the search results) and the secret opens in a small window of its own. Select
+- Click **Secret** (or **Secrets-Only**) on a row, or in the search results, and the secret opens in a window of
+  its own, sized to show the whole text: a one-line secret gets a small window, a long one grows until it would
+  take more than about 60% of the screen's width or 70% of its height, and scrolls inside after that. You can
+  still resize it by hand. Select
   the part you need — a word, a line — and copy it (⌘C, or double-click a word and right-click → Copy). There is
   no Copy button on purpose: a secret usually holds several things.
 - **Hide** closes the window. Closing it any other way does the same. **Edit bookmark…** opens the editor.

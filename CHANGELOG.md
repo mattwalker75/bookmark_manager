@@ -12,6 +12,9 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   keep **Secret**). The editor starts with a **Web page / Secret only** choice: Secret only hides the Address row
   and the secret switch; right-click a directory → **New secret here…**. Validate no longer stops on a missing
   address when the item has a secret.
+- 2026-10-29: **The secret window fits its text** — it opens just big enough to show the whole secret (measured
+  in its own font), never smaller than 420 × 180 and never more than 60% of the screen's width or 70% of its
+  height; a longer secret scrolls inside. Editing the secret refits the window unless you had resized it yourself.
 - 2026-10-28: **The library** — tabs › directories › sub-directories › bookmarks, with the rules Matt set: at least one
   tab always; a tab or directory is deleted only when empty (the refusal names what is still inside); directory
   levels configurable (default 2, 1–6) and never lowered below what exists; bookmarks need a name and an address

@@ -46,7 +46,10 @@ it is not a developer: every message is a plain sentence.
 6. **Secrets: encrypted on disk, NOT the Keychain** (Matt, Oct 28 2026 — an ad-hoc-signed app would be asked again
    after every rebuild): `secrets.enc` + `secret.key` (0600), keyed by bookmark id, never in library.json. Multi-line.
    The secret window is select-to-copy only (no Copy button, Matt). `hasSecret` stays true when the text is blank
-   (an import without secrets), so the row still shows the button and the editor asks for it.
+   (an import without secrets), so the row still shows the button and the editor asks for it. **The secret window
+   sizes itself to its text** (Matt, Oct 29 2026): `SecretWindows.fittedSize` measures the lines in the window's own
+   monospaced font plus the chrome, clamped to `floor` (420×180) and 60% × 70% of the screen; a changed secret
+   refits only while the window is still the size it was given (a hand-resized one is left alone).
 6a. **Secret-only items** (Matt, Oct 29 2026; mockup canvas UG7WKF8nLnByzTDEKbpewk — row A, editor B): a bookmark
     may have NO address when it has a secret (`Bookmark.isSecretOnly` = blank url; `cleaned` refuses blank url +
     no secret). It stays in the same list as every other bookmark (manual order, colors, drag, search by name/tags).
