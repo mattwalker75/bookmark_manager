@@ -74,6 +74,10 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   rendered by make_icns.sh without a browser; user guide, scripts and development docs; 48 tests.
 
 ### Fixed
+- 2026-10-30: **A test was writing the real settings file.** The browser-choice test built an AppModel without a
+  scratch home, so every `swift test` (and every install) reset "Fetch site icons" and "Open bookmarks in" in the
+  real settings.json. The test has its own scratch home now, and `Home.folder()` refuses the real folder whenever
+  it runs under xctest, so no test can ever reach it again.
 - 2026-10-28: **Deep review, core (13 verified findings, each with a regression test).** A damaged library.json
   now takes a copy of secrets.enc aside with it, so the next save can't prune the secrets the recovered file
   needs. Saving is two-phase (secrets old ∪ new → library.json → prune), so a save that fails on library.json

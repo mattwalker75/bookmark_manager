@@ -8,10 +8,19 @@
 import Foundation
 
 public enum Home {
+    /// True inside `swift test` / xctest. A test that forgets to set BOOKMARKMANAGER_HOME must never reach the real
+    /// folder (review 2, Oct 30 2026: one did, and rewrote Matt's settings.json on every run).
+    public static var isTesting: Bool {
+        let env = ProcessInfo.processInfo.environment
+        return env["XCTestConfigurationFilePath"] != nil || env["XCTestBundlePath"] != nil || NSClassFromString("XCTestCase") != nil
+    }
+
     public static func folder() -> URL {
         let dir: URL
         if let h = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_HOME"], !h.isEmpty {
             dir = URL(fileURLWithPath: (h as NSString).expandingTildeInPath, isDirectory: true)
+        } else if isTesting {
+            dir = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarkmanager-tests-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
         } else {
             let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             dir = base.appendingPathComponent("Bookmark Manager", isDirectory: true)

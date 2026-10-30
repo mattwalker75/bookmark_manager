@@ -132,5 +132,7 @@ it is not a developer: every message is a plain sentence.
 13. **Scripts:** BUILD_APP.sh / INSTALL_APP.sh like app_starter's; idempotent, plain-spoken. **Commits:** one per
     feature with a dated CHANGELOG entry; explicit `git add <paths>`; never push — Matt pushes.
 14. **Testing:** `swift test`; never the real Application Support — `BOOKMARKMANAGER_HOME=<scratch>` for the app,
-    `Scratch` in tests; tests set `icons.enabled = false`. Dev hooks: `BOOKMARKMANAGER_SAMPLE=1`,
+    `Scratch` in tests; tests set `icons.enabled = false`. **`Home.folder()` refuses the real folder under xctest**
+    (`Home.isTesting` → a per-process temp folder; review 2, Oct 30 2026: a test without a scratch home had been
+    rewriting Matt's real settings.json on every run) — still give every AppModel test its own scratch home. Dev hooks: `BOOKMARKMANAGER_SAMPLE=1`,
     `BOOKMARKMANAGER_AUTOSHEET=…` (Docs/DEVELOPMENT.md). Prominent buttons look grey in screenshots of an inactive window.

@@ -65,3 +65,17 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(Home.folder().standardizedFileURL.path, s.url.standardizedFileURL.path)
     }
 }
+
+/// Review 2 (Oct 30 2026): no test may ever touch ~/Library/Application Support/Bookmark Manager.
+final class HomeGuardTests: XCTestCase {
+    func testWithoutAScratchHomeTheTestsGetATemporaryFolderNeverTheRealOne() {
+        let saved = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_HOME"]
+        unsetenv("BOOKMARKMANAGER_HOME")
+        defer { if let saved { setenv("BOOKMARKMANAGER_HOME", saved, 1) } }
+        XCTAssertTrue(Home.isTesting)
+        let f = Home.folder()
+        XCTAssertFalse(f.path.contains("Application Support"), f.path)
+        XCTAssertTrue(f.path.contains("bookmarkmanager-tests-"), f.path)
+    }
+}
+

@@ -418,6 +418,14 @@ final class SecretGuardTests: XCTestCase {
 /// Which browser a bookmark opens in (Matt, Oct 29 2026).
 @MainActor
 final class BrowserChoiceTests: XCTestCase {
+    private var home: URL!
+    override func setUp() async throws {
+        home = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarkmanager-browser-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        setenv("BOOKMARKMANAGER_HOME", home.path, 1)
+    }
+    override func tearDown() async throws { unsetenv("BOOKMARKMANAGER_HOME"); try? FileManager.default.removeItem(at: home) }
+
     func testOwnBrowserWinsWhenInstalledElseSettingsWithANote() {
         let m = AppModel(); m.settings.fetchIcons = false; m.icons.enabled = false
         m.settings.browser = "com.apple.Safari"
