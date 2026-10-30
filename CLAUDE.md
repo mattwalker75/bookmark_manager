@@ -104,6 +104,15 @@ it is not a developer: every message is a plain sentence.
     reported; a damaged library.json takes a COPY of secrets.enc with it (review: the next save would prune them).
     Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json, then the prune — a failed library
     write loses no secret. Repeated ids are repaired on load and on import. Settings decode every field with a default.
+11a. **Backups** (Matt, Oct 29 2026; mockup board "Backups"): `Backup` (core) writes ONE JSON `.bmbackup` with the
+    library (secrets blank) + the secrets sealed with THIS MAC'S secret.key + optionally the key sealed with a
+    passphrase (`PassphraseWrap`, PBKDF2 600k rounds); `BackupStore` lists / writes / `setKept` (kept + note live IN
+    the file) / `prune(keep:)` (never a kept one, never an unreadable file). `AppModel.backUp` skips when
+    `Backup.digest` is unchanged unless forced; schedule `BackupWhen` (default daily + quit, `AppDelegate.beforeQuit`);
+    "Enable backups" is the label (Matt). Verify = `Backup.check` (Validate's checks + can the secrets open);
+    Restore writes a KEPT "before restore" backup first, then goes through `importFile(.replace)` so the secrets are
+    re-sealed with the current key. Fresh-Mac path: Restore from a file… → asks for the key file or the passphrase.
+    "Save a copy of the secret key…" exists for that day. NO password generator anywhere.
 12. **Text fields are `PlainTextField` / `Field`**, the secret is a `TextBox` (data_syncer rule 14b). Base text 14.
 12a. **One copy at a time, and the disk is the truth** (review, Oct 28 2026): `AppDelegate` quits a second copy of the
     .app and brings the first forward; `LibraryStore` remembers library.json's size+date and refuses a save when

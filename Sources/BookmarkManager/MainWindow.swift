@@ -77,6 +77,15 @@ struct MainWindow: View {
             case "move": if let b { model.sheet = .move(.bookmark(b.id)) }
             case "secret": if let b { model.showSecret(b) }
             case "linkcheck": model.checkLinks()
+            case "backupcheck":
+                // the Verify sheet for the newest backup, in a window of its own (there is one: the launch wrote it)
+                model.refreshBackups()
+                if let e = model.backups.first {
+                    let w = NSWindow(contentRect: NSRect(x: 500, y: 300, width: 620, height: 420), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+                    w.title = "Verify"; w.isReleasedWhenClosed = false
+                    w.contentView = NSHostingView(rootView: BackupCheckSheet(url: e.url) { _ in }.environmentObject(model).preferredColorScheme(model.lookInForce.colorScheme).tint(Theme.accent).font(DS.body))
+                    w.makeKeyAndOrderFront(nil)
+                }
             case "linkreport", "linkreport:sheet":
                 // a made-up report over the sample, so the marks, the banner and the sheet can be looked at without the network
                 func r(_ name: String, _ v: LinkVerdict) -> LinkResult? { model.library.allBookmarks.first { $0.name == name }.map { LinkResult(bookmarkId: $0.id, url: $0.url, verdict: v) } }

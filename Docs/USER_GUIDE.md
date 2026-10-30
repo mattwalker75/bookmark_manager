@@ -141,6 +141,25 @@ hidden until you ask for it.
   - **Replace everything here** — what is here is thrown away first (it asks again). If the file was exported
     without secrets, bookmarks that are already here keep the secrets they have.
 
+## Backups
+- Settings → **Backups**. **Enable backups** is on from the start: a backup is one file (`Bookmark Manager
+  2026-10-29 14-02-33.bmbackup`) holding everything — tabs, directories, bookmarks, color codes, the directory
+  levels and the secrets — written into the Backups folder beside your bookmarks (or any folder you choose:
+  iCloud Drive, a Data Syncer folder) only when something changed since the last one.
+- **When:** every day · every day and when the app quits (the usual) · after every change, at most once an hour ·
+  only when you click **Back up now**. **Keep the latest** 5 to 90; older ones fall off the end — except the ones
+  you mark **Keep…** (with a note, if you like: "before the big re-sort"), which stay for good.
+- **Verify…** on any backup reads it right through and says what it holds and whether its secrets open.
+  **Restore…** (from the Verify sheet) replaces everything here with what the backup holds; a kept backup of the
+  way things were is written first, so a restore can itself be undone.
+- **The secrets inside** are sealed with this Mac's secret key, the same as on disk. So: **Save a copy of the
+  secret key…** once, somewhere safe (a password manager, a USB stick). Optionally **set a passphrase**; from then
+  on each backup also opens with the words alone.
+- **Starting over on a new Mac:** install Bookmark Manager, open Settings → Backups → **Restore from a file…**,
+  pick the backup. The app finds its own new key doesn't open the secrets and asks for either the key file you
+  saved or the passphrase. Verify, then Restore. The secrets are re-sealed with the new Mac's key from there on.
+- Note: anyone with a backup *and* the key (or the passphrase) can read the secrets. Keep the key like a password.
+
 ## One copy at a time
 Opening Bookmark Manager twice just brings the open one forward. If something else changes the bookmarks file
 while the app is open (a second copy run by hand, an edit to the file), the next change is refused with a

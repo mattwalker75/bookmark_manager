@@ -12,6 +12,12 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   keep **Secret**). The editor starts with a **Web page / Secret only** choice: Secret only hides the Address row
   and the secret switch; right-click a directory → **New secret here…**. Validate no longer stops on a missing
   address when the item has a secret.
+- 2026-10-29: **Backups** (Matt's pick, with his changes: "Enable backups", Verify, the key) — Settings → Backups:
+  dated backup files of everything, secrets sealed with this Mac's key, written daily and on quit (or after
+  changes, or by hand) into a folder you choose, only when something changed; keep the latest N, mark any as
+  kept with a note so it never ages out; Verify reads one through and says whether its secrets open; Restore
+  writes a kept backup of "now" first. Save a copy of the secret key, or set a passphrase that also opens the
+  backups; on a new Mac, Restore from a file… asks for one or the other.
 - 2026-10-29: **Check links** (Matt's pick: option B) — Settings → General → Check every address…, or right-click a
   directory → Check links in this directory…: each address is asked for once (HEAD, then GET when a server
   dislikes HEAD), five at a time, eight seconds each. One sheet lists the problems with their place: gone (404/410),

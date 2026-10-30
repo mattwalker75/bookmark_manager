@@ -30,6 +30,14 @@ public final class SecretBox: @unchecked Sendable {
         return k
     }
 
+    /// This Mac's key as it is (nil when none has been made yet) — for backups, which seal the secrets with it.
+    public func currentKey() throws -> SymmetricKey? { try key(create: false) }
+    /// This Mac's key, made now if there is none yet.
+    public func ensureKey() throws -> SymmetricKey {
+        guard let k = try key(create: true) else { throw BMError("The secrets key could not be made.") }
+        return k
+    }
+
     /// bookmark id → secret text
     public func load() throws -> [String: String] {
         guard FileManager.default.fileExists(atPath: dataURL.path) else { return [:] }

@@ -12,6 +12,7 @@ struct SettingsView: View {
             GeneralPane().tabItem { Label("General", systemImage: "gearshape") }.tag("general")
             ColorCodesPane().tabItem { Label("Color codes", systemImage: "paintpalette") }.tag("colors")
             AppearancePane().tabItem { Label("Appearance", systemImage: "circle.lefthalf.filled") }.tag("appearance")
+            BackupsPane().tabItem { Label("Backups", systemImage: "clock.arrow.circlepath") }.tag("backups")
             TransferPane().tabItem { Label("Export & import", systemImage: "square.and.arrow.up.on.square") }.tag("transfer")
         }
         .frame(width: 680, height: 560)

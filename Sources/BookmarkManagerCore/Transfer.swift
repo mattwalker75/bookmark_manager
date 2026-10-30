@@ -93,9 +93,14 @@ public enum Transfer {
 
     /// Reads a file and lists everything wrong with it, with where each problem is. Changes nothing.
     public static func validate(_ data: Data) -> ValidationReport {
-        var r = ValidationReport()
         let f: ExportFile
-        do { f = try read(data) } catch { r.problems.append(Problem(place: "The file", text: (error as? BMError)?.message ?? error.localizedDescription, stops: true)); return r }
+        do { f = try read(data) } catch { var r = ValidationReport(); r.problems.append(Problem(place: "The file", text: (error as? BMError)?.message ?? error.localizedDescription, stops: true)); return r }
+        return validate(f)
+    }
+
+    /// The same checks on a file already read (a backup's library, for instance).
+    public static func validate(_ f: ExportFile) -> ValidationReport {
+        var r = ValidationReport()
         r.secretsIncluded = f.secretsIncluded
         let lib = f.library
         r.tabs = lib.tabs.count

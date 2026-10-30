@@ -4,6 +4,7 @@
 import SwiftUI
 import BookmarkManagerCore
 import Combine
+import CryptoKit
 
 enum MainSheet: Identifiable {
     case newBookmark(FolderPath)
@@ -280,8 +281,110 @@ final class AppModel: ObservableObject {
     private func save() -> Bool {
         do { try store.save(library) } catch { notice = Notice(title: "The bookmarks could not be saved", message: (error as? BMError)?.message ?? error.localizedDescription); return false }
         fixSelection()
+        backupAfterChangeIfDue()
         return true
     }
+
+    // MARK: backups (Matt, Oct 29 2026)
+
+    var backupStore: BackupStore {
+        BackupStore(folder: settings.backupFolder.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true) } ?? store.folder.appendingPathComponent("Backups", isDirectory: true))
+    }
+    /// the backups in the folder, as the pane shows them (refreshBackups() reads the folder again)
+    @Published var backups: [BackupEntry] = []
+    func refreshBackups() { backups = backupStore.list() }
+
+    /// Writes a backup now. `force` = even when nothing changed since the last one (by hand, before a restore).
+    /// Returns a sentence about what happened, or nil when it was skipped because nothing changed.
+    @discardableResult
+    func backUp(reason: BackupReason, force: Bool = false, kept: Bool = false, note: String = "") -> String? {
+        let digest = Backup.digest(library)
+        if !force, digest == settings.lastBackupDigest { return nil }
+        do {
+            let key = try store.secrets.currentKey() ?? (library.allBookmarks.contains(where: \.hasSecret) ? try store.secrets.ensureKey() : nil)
+            let data = try Backup.make(library, key: key, passphrase: settings.backupPassphrase, reason: reason, kept: kept, note: note)
+            let url = try backupStore.write(data, at: Date())
+            settings.lastBackupDigest = digest; settings.lastBackupAt = Date()
+            backupStore.prune(keep: settings.backupKeep)
+            refreshBackups()
+            return "Backed up to \(url.lastPathComponent)."
+        } catch {
+            let why = (error as? BMError)?.message ?? error.localizedDescription
+            notice = Notice(title: "The backup could not be written", message: why)
+            return why
+        }
+    }
+    private var backupIsDue: Bool {
+        guard let last = settings.lastBackupAt else { return true }
+        return Date().timeIntervalSince(last) >= 86_400
+    }
+    /// At launch: a daily backup when the last one is a day old (and something changed).
+    func backupAtLaunchIfDue() {
+        guard settings.backupsEnabled, [.daily, .dailyAndQuit].contains(settings.backupWhen), backupIsDue else { return }
+        backUp(reason: .daily)
+    }
+    /// After a save: the "after every change" setting, at most once an hour.
+    private func backupAfterChangeIfDue() {
+        guard settings.backupsEnabled, settings.backupWhen == .everyChange else { return }
+        if let last = settings.lastBackupAt, Date().timeIntervalSince(last) < 3_600 { return }
+        backUp(reason: .change)
+    }
+    /// When the app quits: the "and when the app quits" setting, if something changed.
+    func backupOnQuit() {
+        guard settings.backupsEnabled, settings.backupWhen == .dailyAndQuit else { return }
+        backUp(reason: .quit)
+    }
+    func setKept(_ e: BackupEntry, kept: Bool, note: String) {
+        do { try backupStore.setKept(e.url, kept: kept, note: note) } catch { notice = Notice(title: "The backup wasn't marked", message: (error as? BMError)?.message ?? error.localizedDescription) }
+        refreshBackups()
+    }
+    func deleteBackup(_ e: BackupEntry) {
+        do { try FileManager.default.removeItem(at: e.url) } catch { notice = Notice(title: "The backup wasn't deleted", message: error.localizedDescription) }
+        refreshBackups()
+    }
+    /// Verify: with this Mac's key, a key file chosen, or a passphrase typed.
+    func checkBackup(at url: URL, keyFile: URL? = nil, passphrase: String? = nil) -> Result<BackupCheck, BMError> {
+        let data: Data
+        do { data = try Data(contentsOf: url) } catch { return .failure(BMError("Could not read \(url.lastPathComponent): \(error.localizedDescription)")) }
+        var key: SymmetricKey?
+        var how = "this Mac's key"
+        if let keyFile {
+            guard let d = try? Data(contentsOf: keyFile), d.count == 32 else { return .failure(BMError("\(keyFile.lastPathComponent) isn't a Bookmark Manager key file (it should be exactly 32 bytes).")) }
+            key = SymmetricKey(data: d); how = "the key file \(keyFile.lastPathComponent)"
+        } else if let passphrase {
+            guard let f = try? Backup.read(data), let wrap = f.passphrase else { return .failure(BMError("This backup has no passphrase on it; it needs the key file.")) }
+            do { key = try wrap.unwrap(passphrase: passphrase) } catch let e as BMError { return .failure(e) } catch { return .failure(BMError(error.localizedDescription)) }
+            how = "the passphrase"
+        } else {
+            key = try? store.secrets.currentKey()
+        }
+        return Backup.check(data, at: url, key: key, openedWith: how)
+    }
+    /// Restore: a kept backup of "now" first, then the backup's library (its secrets re-sealed with this Mac's key).
+    func restoreBackup(_ check: BackupCheck) -> String {
+        guard check.canRestore else { return "This backup can't be restored as it is." }
+        if !library.allBookmarks.isEmpty || library.tabs.count > 1 {
+            backUp(reason: .beforeRestore, force: true, kept: true, note: "Before restoring \(check.url.lastPathComponent)")
+        }
+        let lib = Backup.library(check.file, secrets: check.secrets)
+        let notes = importFile(ExportFile(secretsIncluded: true, library: lib), mode: .replace)
+        settings.lastBackupDigest = Backup.digest(library)
+        refreshBackups()
+        var s = "Restored \(check.file.counts.text) from \(check.url.lastPathComponent)."
+        if !notes.isEmpty { s += " " + notes.joined(separator: " ") }
+        return s
+    }
+    /// A copy of secret.key, for the fresh-Mac day.
+    func saveKeyCopy(to url: URL) throws {
+        let key = try store.secrets.ensureKey()
+        try key.withUnsafeBytes { Data($0) }.write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+    func setBackupPassphrase(_ p: String) throws {
+        settings.backupPassphrase = try PassphraseWrap.make(key: try store.secrets.ensureKey(), passphrase: p)
+        settings.lastBackupDigest = nil   // the next backup carries it
+    }
+    func clearBackupPassphrase() { settings.backupPassphrase = nil; settings.lastBackupDigest = nil }
 
     /// Runs a change on the library; a refusal (or a failed save) becomes a notice and nothing changes. True when it went through.
     @discardableResult
@@ -454,6 +557,16 @@ struct AppSettings: Codable, Equatable {
     var touchIDForSecrets = false
     /// check every address on its own every this many days; 0 = never (Matt, Oct 29 2026)
     var linkCheckDays = 0
+    // backups (Matt, Oct 29 2026)
+    var backupsEnabled = true
+    /// nil = <home>/Backups
+    var backupFolder: String?
+    var backupWhen = BackupWhen.dailyAndQuit
+    var backupKeep = 14
+    /// this Mac's key sealed with the passphrase, when one was set (goes into every backup)
+    var backupPassphrase: PassphraseWrap?
+    var lastBackupDigest: String?
+    var lastBackupAt: Date?
 
     var activeTheme: CustomTheme? { activeThemeId.flatMap { id in themes.first { $0.id == id } } }
     var effectiveAppearance: Appearance { activeTheme?.look ?? appearance }
@@ -472,14 +585,37 @@ struct AppSettings: Codable, Equatable {
         secretHideMinutes = max(0, try c.decodeIfPresent(Int.self, forKey: .secretHideMinutes) ?? 5)
         touchIDForSecrets = try c.decodeIfPresent(Bool.self, forKey: .touchIDForSecrets) ?? false
         linkCheckDays = max(0, try c.decodeIfPresent(Int.self, forKey: .linkCheckDays) ?? 0)
+        backupsEnabled = try c.decodeIfPresent(Bool.self, forKey: .backupsEnabled) ?? true
+        backupFolder = try c.decodeIfPresent(String.self, forKey: .backupFolder).flatMap { $0.isEmpty ? nil : $0 }
+        backupWhen = (try? c.decodeIfPresent(BackupWhen.self, forKey: .backupWhen)) ?? .dailyAndQuit
+        backupKeep = max(1, try c.decodeIfPresent(Int.self, forKey: .backupKeep) ?? 14)
+        backupPassphrase = try? c.decodeIfPresent(PassphraseWrap.self, forKey: .backupPassphrase)
+        lastBackupDigest = try c.decodeIfPresent(String.self, forKey: .lastBackupDigest)
+        lastBackupAt = try? c.decodeIfPresent(Date.self, forKey: .lastBackupAt)
     }
 
     static var url: URL { Home.folder().appendingPathComponent("settings.json") }
+    static let encoder: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; e.outputFormatting = [.prettyPrinted, .sortedKeys]; return e }()
     static func load() -> AppSettings {
-        guard let data = try? Data(contentsOf: url), let s = try? JSONDecoder().decode(AppSettings.self, from: data) else { return AppSettings() }
+        let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
+        guard let data = try? Data(contentsOf: url), let s = try? d.decode(AppSettings.self, from: data) else { return AppSettings() }
         return s
     }
-    func save() { if let data = try? JSONEncoder().encode(self) { try? data.write(to: AppSettings.url, options: .atomic) } }
+    func save() { if let data = try? AppSettings.encoder.encode(self) { try? data.write(to: AppSettings.url, options: .atomic) } }
+}
+
+/// When backups are written on their own.
+enum BackupWhen: String, Codable, CaseIterable, Identifiable {
+    case daily, dailyAndQuit, everyChange, manual
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .daily: return "Every day"
+        case .dailyAndQuit: return "Every day, and when the app quits"
+        case .everyChange: return "After every change (at most once an hour)"
+        case .manual: return "Only when I click Back up now"
+        }
+    }
 }
 
 extension Bookmark {

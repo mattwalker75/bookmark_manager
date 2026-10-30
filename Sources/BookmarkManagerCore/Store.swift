@@ -107,7 +107,7 @@ public final class LibraryStore: @unchecked Sendable {
         guard let seen = lastSeen else { return true }
         return now.size != seen.size || now.modified != seen.modified
     }
-    private static func fill(_ f: inout Folder, _ values: [String: String]) {
+    static func fill(_ f: inout Folder, _ values: [String: String]) {
         for i in f.bookmarks.indices where f.bookmarks[i].hasSecret { f.bookmarks[i].secret = values[f.bookmarks[i].id.uuidString] ?? "" }
         for i in f.folders.indices { fill(&f.folders[i], values) }
     }
@@ -133,7 +133,7 @@ public final class LibraryStore: @unchecked Sendable {
         if Set(old.keys) != Set(values.keys) { try secrets.save(values) }
         remember()
     }
-    private static func strip(_ f: inout Folder, into values: inout [String: String]) {
+    static func strip(_ f: inout Folder, into values: inout [String: String]) {
         for i in f.bookmarks.indices {
             if f.bookmarks[i].hasSecret { values[f.bookmarks[i].id.uuidString] = f.bookmarks[i].secret }
             f.bookmarks[i].secret = ""

@@ -17,7 +17,12 @@ struct BookmarkManagerApp: App {
                 .tint(Theme.accent)
                 .font(DS.body)
                 .frame(minWidth: 900, minHeight: 560)
-                .onAppear { model.addSampleIfAsked(); model.runScheduledLinkCheckIfDue() }
+                .onAppear {
+                    model.addSampleIfAsked()
+                    model.runScheduledLinkCheckIfDue()
+                    model.backupAtLaunchIfDue()
+                    AppDelegate.beforeQuit = { [weak model] in model?.backupOnQuit() }
+                }
         }
         .defaultSize(width: 1180, height: 760)
         .commands {
@@ -76,6 +81,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // a plain utility: closing its last window quits it
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { true }
+
+    /// Runs just before the app quits (the "when the app quits" backup).
+    static var beforeQuit: (() -> Void)?
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        AppDelegate.beforeQuit?()
+        return .terminateNow
+    }
 
     /// The Dock icon clicked while only a secret window is open: the main window comes back.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
