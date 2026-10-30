@@ -36,6 +36,12 @@ it is not a developer: every message is a plain sentence.
 2. **Structure:** at least one tab always exists (`deleteTab` refuses the last one). Directory levels are
    `Library.maxDepth` (Settings → General; default 2 = directory + sub-directory; range 1…6); lowering it is refused
    while a deeper directory exists. Bookmarks live at a tab's top level or in any directory.
+2a. **The folder tree collapses** (Matt, Oct 29 2026; tweaks canvas option A): a directory with sub-directories
+    shows a chevron; its branch is open only while its id is in `AppSettings.expanded` (settings.json; pruned to
+    existing directories at launch). Everything starts closed. `AppModel.select` → `reveal(path)` opens the
+    directories ABOVE the selection (not the selection itself); Show in place on a directory opens its parent;
+    `addFolder` opens the parent. The chevron is a Button outside the row's select tap. Closed with children, the
+    count reads "3 · 2 dirs". The tab's top level always lists its directories.
 3. **Delete only when empty:** a tab, directory or sub-directory with anything in it is refused with a sentence
    naming what is inside. Deleting a bookmark asks first (confirm buttons have no destructive role, Cancel is default).
 4. **Order is manual** (drag and drop, Move to…); "Sort by name" sorts one directory once. Drop rules live in

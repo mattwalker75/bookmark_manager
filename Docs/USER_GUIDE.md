@@ -14,8 +14,13 @@ hidden until you ask for it.
 - A tab can only be deleted when it is **empty** — no bookmarks, no directories — and never the last one.
 
 ## Directories and sub-directories
-- The directory list on the left shows the open tab's directories and their sub-directories, each with its
-  description (if it has one) and how many bookmarks sit directly in it. Click one to open it on the right.
+- The directory list on the left shows the open tab's directories, each with its description (if it has one)
+  and how many bookmarks sit directly in it. Click one to open it on the right.
+- A directory with sub-directories has a **chevron** in front of it: click the chevron (or right-click → Show /
+  Hide sub-directories) to open or close that branch. Closed, its count reads "3 · 2 dirs" so you can see there
+  is more inside. The app remembers which branches you left open, in every tab, across launches. Opening a
+  directory from the search (Show in place), Move to…, or making a new directory inside one, opens the branch
+  that leads to it.
 - **New directory** (bottom of the directory list, the button at the top of a directory's page, ⇧⌘N, or
   right-click → New directory inside…) makes one inside the open directory — or beside it, when the levels don't
   allow one deeper. Give it a name, an optional description, a color.

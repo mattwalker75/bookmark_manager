@@ -12,6 +12,11 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   keep **Secret**). The editor starts with a **Web page / Secret only** choice: Secret only hides the Address row
   and the secret switch; right-click a directory → **New secret here…**. Validate no longer stops on a missing
   address when the item has a secret.
+- 2026-10-29: **Collapsible directories** (Matt's pick: option A, chevrons) — a directory with sub-directories
+  gets a chevron in the folder tree; click it (or right-click → Show / Hide sub-directories) to open or close the
+  branch. Everything starts closed; what you open is remembered in settings.json across launches. A closed
+  directory's count reads "3 · 2 dirs". Selecting a directory, Show in place, Move to… and New directory inside…
+  open the branch that leads there.
 - 2026-10-29: **The secret window fits its text** — it opens just big enough to show the whole secret (measured
   in its own font), never smaller than 420 × 180 and never more than 60% of the screen's width or 70% of its
   height; a longer secret scrolls inside. Editing the secret refits the window unless you had resized it yourself.

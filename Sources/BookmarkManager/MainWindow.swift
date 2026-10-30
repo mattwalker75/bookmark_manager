@@ -234,14 +234,17 @@ struct FolderTree: View {
 
 }
 
-/// A folder and, below it, its sub-folders.
+/// A folder and, below it, its sub-folders — only while its chevron is open (the tab's top level always shows its directories).
 struct TreeBranch: View {
+    @EnvironmentObject var model: AppModel
     let folder: Folder
     let path: FolderPath
     let depth: Int
     var body: some View {
         TreeRow(folder: folder, path: path, depth: depth)
-        ForEach(folder.folders) { f in TreeBranch(folder: f, path: path.appending(f.id), depth: depth + 1) }
+        if model.isExpanded(folder.id) {
+            ForEach(folder.folders) { f in TreeBranch(folder: f, path: path.appending(f.id), depth: depth + 1) }
+        }
     }
 }
 
@@ -257,28 +260,55 @@ struct TreeRow: View {
 
     private var selected: Bool { model.selectedPath == path && !model.isSearching }
     private var tint: Color? { model.color(folder.colorId).map { $0.rgb.color.opacity(scheme == .dark ? 0.30 : 0.22) } }
+    private var expanded: Bool { model.isExpanded(folder.id) }
+    private var hasChildren: Bool { !folder.folders.isEmpty }
+
+    /// "4", or "4 · 2 dirs" while the directory is closed with sub-directories inside
+    private var count: String {
+        let n = folder.bookmarks.count
+        if depth > 0, hasChildren, !expanded { return "\(n) · \(folder.folders.count) dir\(folder.folders.count == 1 ? "" : "s")" }
+        return "\(n)"
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: depth == 0 ? "rectangle.topthird.inset.filled" : "folder")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(selected ? Theme.accent : Color.secondary)
-                .frame(width: 18).padding(.top, 2)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(folder.name).fontWeight(selected ? .semibold : .regular).lineLimit(1)
-                if !folder.description.isEmpty { Text(folder.description).font(.system(size: 12.5)).foregroundStyle(.secondary).lineLimit(2) }
+            if depth > 0 {
+                // the chevron: a button of its own, outside the row's select tap, so a click on it only opens or closes
+                if hasChildren {
+                    Button { model.toggleExpanded(folder.id) } label: {
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(expanded ? 90 : 0))
+                            .frame(width: 14, height: 18).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain).padding(.top, 1)
+                    .help(expanded ? "Hide its sub-directories" : "Show its sub-directories")
+                    .accessibilityLabel(expanded ? "Collapse \(folder.name)" : "Expand \(folder.name)")
+                } else {
+                    Color.clear.frame(width: 14, height: 18)
+                }
             }
-            Spacer(minLength: 4)
-            Text("\(folder.bookmarks.count)").font(DS.secondary).foregroundStyle(.secondary).monospacedDigit().padding(.top, 1)
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: depth == 0 ? "rectangle.topthird.inset.filled" : "folder")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(selected ? Theme.accent : Color.secondary)
+                    .frame(width: 18).padding(.top, 2)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(folder.name).fontWeight(selected ? .semibold : .regular).lineLimit(1)
+                    if !folder.description.isEmpty { Text(folder.description).font(.system(size: 12.5)).foregroundStyle(.secondary).lineLimit(2) }
+                }
+                Spacer(minLength: 4)
+                Text(count).font(DS.secondary).foregroundStyle(.secondary).monospacedDigit().padding(.top, 1)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { model.select(path) }
         }
         .padding(.vertical, 6).padding(.horizontal, 8)
-        .padding(.leading, CGFloat(max(0, depth - 1)) * 18 + (depth > 0 ? 6 : 0))
+        .padding(.leading, CGFloat(max(0, depth - 1)) * 18)
         .background(background, in: RoundedRectangle(cornerRadius: DS.radiusSmall))
         .overlay(RoundedRectangle(cornerRadius: DS.radiusSmall).strokeBorder(Theme.accent, lineWidth: targeted ? 2 : (model.highlightId == folder.id ? 2 : 0)))
         .contentShape(Rectangle())
         .onHover { over = $0 }
-        .onTapGesture { model.select(path) }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
         .help(folder.description.isEmpty ? folder.name : "\(folder.name) — \(folder.description)")
         .modifier(FolderDrag(folder: folder, isTab: depth == 0))
@@ -288,6 +318,7 @@ struct TreeRow: View {
         } isTargeted: { targeted = $0 }
         .contextMenu {
             Button("Open") { model.select(path) }
+            if depth > 0, hasChildren { Button(expanded ? "Hide sub-directories" : "Show sub-directories") { model.toggleExpanded(folder.id) } }
             if path.depth + 1 <= model.library.maxDepth { Button("New directory inside…") { model.sheet = .newFolder(path) } }
             Button("New bookmark here…") { model.sheet = .newBookmark(path) }
             Button("New secret here…") { model.sheet = .newSecret(path) }

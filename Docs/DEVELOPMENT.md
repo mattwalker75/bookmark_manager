@@ -49,7 +49,7 @@ the .app running.
 `Home.folder()` = `~/Library/Application Support/Bookmark Manager/`, or `$BOOKMARKMANAGER_HOME`.
 `library.json` (`{"app":"Bookmark Manager","library":{…}}`, secrets blank) · `secrets.enc` (AES-GCM,
 `{bookmarkId: text}`) · `secret.key` (32 random bytes, 0600) · `settings.json` (appearance, accent, themes,
-activeThemeId, browser bundle id, fetchIcons) · `icons/<host>.png` (`<host>_<port>.png` for a non-standard port).
+activeThemeId, browser bundle id, fetchIcons, `expanded` = the directory ids whose branch is open in the tree) · `icons/<host>.png` (`<host>_<port>.png` for a non-standard port).
 
 The export file is `{"app":"Bookmark Manager","version":1,"exportedAt":…,"secretsIncluded":bool,"library":{…}}`
 with the library exactly as in library.json (plus the secrets when included).

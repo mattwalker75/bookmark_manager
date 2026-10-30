@@ -274,3 +274,51 @@ final class TweakTests: XCTestCase {
         XCTAssertEqual(SecretWindows.fittedSize(for: forty.debugDescription, screen: NSSize(width: 300, height: 200)), SecretWindows.floor)
     }
 }
+
+/// The folder tree's open and closed branches (Matt, Oct 29 2026: chevrons, remembered).
+@MainActor
+final class TreeStateTests: XCTestCase {
+    private var home: URL!
+    override func setUp() async throws {
+        home = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarkmanager-tree-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        setenv("BOOKMARKMANAGER_HOME", home.path, 1)
+    }
+    override func tearDown() async throws { unsetenv("BOOKMARKMANAGER_HOME"); try? FileManager.default.removeItem(at: home) }
+    private func model() -> AppModel { let m = AppModel(); m.settings.fetchIcons = false; m.icons.enabled = false; return m }
+
+    func testBranchesStartClosedOpenOnSelectionAndAreRemembered() throws {
+        let m = model()
+        m.importFileForTest(Sample.library())
+        let selfHosted = try XCTUnwrap(m.library.allFolders.first { $0.name == "Self-hosted apps" })
+        let admin = try XCTUnwrap(selfHosted.folders.first { $0.name == "Admin pages" })
+        let vendors = try XCTUnwrap(m.library.allFolders.first { $0.name == "Vendors" })
+        XCTAssertFalse(m.isExpanded(selfHosted.id), "everything starts closed")
+        // selecting the sub-directory opens the directory above it, not the sub-directory itself
+        let path = try XCTUnwrap(m.library.path(toFolder: admin.id))
+        m.select(path)
+        XCTAssertTrue(m.isExpanded(selfHosted.id)); XCTAssertFalse(m.isExpanded(admin.id)); XCTAssertFalse(m.isExpanded(vendors.id))
+        // the chevron
+        m.toggleExpanded(vendors.id); XCTAssertTrue(m.isExpanded(vendors.id))
+        m.toggleExpanded(selfHosted.id); XCTAssertFalse(m.isExpanded(selfHosted.id))
+        // a new directory inside a closed one opens it
+        m.addFolder(name: "Inside", description: "", colorId: nil, in: try XCTUnwrap(m.library.path(toFolder: selfHosted.id)))
+        XCTAssertTrue(m.isExpanded(selfHosted.id))
+        // remembered across launches, through settings.json
+        let again = model()
+        XCTAssertTrue(again.isExpanded(vendors.id)); XCTAssertTrue(again.isExpanded(selfHosted.id)); XCTAssertFalse(again.isExpanded(admin.id))
+    }
+
+    func testStaleIdsDropOutAndShowInPlaceOpensTheFoundDirectorysParent() throws {
+        let m = model()
+        m.importFileForTest(Sample.library())
+        let gone = UUID()
+        m.settings.expanded.insert(gone)
+        XCTAssertFalse(model().isExpanded(gone), "an id that is no directory is forgotten at the next launch")
+        let hit = try XCTUnwrap(m.library.search("admin pages").first { $0.isFolder })
+        let selfHosted = try XCTUnwrap(m.library.allFolders.first { $0.name == "Self-hosted apps" })
+        m.showInPlace(hit)
+        XCTAssertTrue(m.isExpanded(selfHosted.id))
+        XCTAssertEqual(m.selectedPath, hit.path.parent)
+    }
+}

@@ -73,6 +73,23 @@ final class AppModel: ObservableObject {
         notice = first
         Theme.apply(settings)
         icons.enabled = settings.fetchIcons
+        // directories that no longer exist drop out of the remembered tree state
+        let known = Set(lib.allFolders.map(\.id))
+        if !settings.expanded.isSubset(of: known) { settings.expanded.formIntersection(known) }
+    }
+
+    // MARK: the folder tree's open and closed branches (Matt, Oct 29 2026: chevrons, remembered)
+
+    func isExpanded(_ folderId: UUID) -> Bool { settings.expanded.contains(folderId) }
+    func setExpanded(_ folderId: UUID, _ open: Bool) {
+        if open { settings.expanded.insert(folderId) } else { settings.expanded.remove(folderId) }
+    }
+    func toggleExpanded(_ folderId: UUID) { setExpanded(folderId, !isExpanded(folderId)) }
+    /// Opens every directory above `path`, so its row can be seen (the directory itself stays as it was).
+    func reveal(_ path: FolderPath) {
+        let above = path.ids.dropFirst().dropLast()
+        guard !above.isEmpty, !above.allSatisfy(settings.expanded.contains) else { return }
+        settings.expanded.formUnion(above)
     }
 
     // MARK: reading
@@ -103,6 +120,7 @@ final class AppModel: ObservableObject {
         guard library.folder(at: path) != nil else { return }
         selectedTabId = path.tabId
         selectedPath = path
+        reveal(path)
     }
 
     /// After a change, the selection still points at something that exists.
@@ -118,6 +136,7 @@ final class AppModel: ObservableObject {
     func showInPlace(_ hit: SearchHit) {
         query = ""
         select(hit.isFolder ? (hit.path.parent ?? hit.path) : hit.path)
+        if hit.isFolder, let parent = hit.path.parent, !parent.isTabRoot { setExpanded(parent.folderId, true) }   // the found directory's row is in view
         flash(hit.id)
     }
 
@@ -167,7 +186,9 @@ final class AppModel: ObservableObject {
     // MARK: directories
 
     func addFolder(name: String, description: String, colorId: UUID?, in path: FolderPath) {
-        change("The directory wasn't made") { _ = try $0.addFolder(name: name, description: description, colorId: colorId, in: path) }
+        if change("The directory wasn't made", { _ = try $0.addFolder(name: name, description: description, colorId: colorId, in: path) }), !path.isTabRoot {
+            setExpanded(path.folderId, true)   // the new directory can be seen in the tree
+        }
     }
     func updateFolder(_ id: UUID, name: String, description: String, colorId: UUID?) {
         change("The directory wasn't saved") { try $0.updateFolder(id, name: name, description: description, colorId: colorId) }
@@ -278,6 +299,8 @@ struct AppSettings: Codable, Equatable {
     /// the bundle id of the browser bookmarks open in; nil = the Mac's default browser
     var browser: String?
     var fetchIcons = true
+    /// the directories whose sub-directories are shown in the folder tree (everything else is collapsed; remembered)
+    var expanded: Set<UUID> = []
 
     var activeTheme: CustomTheme? { activeThemeId.flatMap { id in themes.first { $0.id == id } } }
     var effectiveAppearance: Appearance { activeTheme?.look ?? appearance }
@@ -292,6 +315,7 @@ struct AppSettings: Codable, Equatable {
         activeThemeId = try c.decodeIfPresent(UUID.self, forKey: .activeThemeId)
         browser = try c.decodeIfPresent(String.self, forKey: .browser)
         fetchIcons = try c.decodeIfPresent(Bool.self, forKey: .fetchIcons) ?? true
+        expanded = try c.decodeIfPresent(Set<UUID>.self, forKey: .expanded) ?? []
     }
 
     static var url: URL { Home.folder().appendingPathComponent("settings.json") }
