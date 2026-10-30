@@ -49,13 +49,15 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
     public var secret: String
     /// the bundle id of a browser this one opens in instead of the one in Settings; nil = the Settings browser (Matt, Oct 29 2026)
     public var browser: String?
+    /// left out of link checks (Matt, Oct 30 2026: a site that always complains but is wanted anyway)
+    public var skipLinkCheck: Bool
 
-    public init(id: UUID = UUID(), name: String, description: String = "", url: String, tags: [String] = [], colorId: UUID? = nil, hasSecret: Bool = false, secret: String = "", browser: String? = nil) {
+    public init(id: UUID = UUID(), name: String, description: String = "", url: String, tags: [String] = [], colorId: UUID? = nil, hasSecret: Bool = false, secret: String = "", browser: String? = nil, skipLinkCheck: Bool = false) {
         self.id = id; self.name = name; self.description = description; self.url = url; self.tags = tags
-        self.colorId = colorId; self.hasSecret = hasSecret; self.secret = secret; self.browser = browser
+        self.colorId = colorId; self.hasSecret = hasSecret; self.secret = secret; self.browser = browser; self.skipLinkCheck = skipLinkCheck
     }
 
-    enum CodingKeys: String, CodingKey { case id, name, description, url, tags, colorId, hasSecret, secret, browser }
+    enum CodingKeys: String, CodingKey { case id, name, description, url, tags, colorId, hasSecret, secret, browser, skipLinkCheck }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
@@ -67,6 +69,7 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
         hasSecret = try c.decodeIfPresent(Bool.self, forKey: .hasSecret) ?? false
         secret = try c.decodeIfPresent(String.self, forKey: .secret) ?? ""
         browser = try c.decodeIfPresent(String.self, forKey: .browser).flatMap { $0.isEmpty ? nil : $0 }
+        skipLinkCheck = (try? c.decodeIfPresent(Bool.self, forKey: .skipLinkCheck)) ?? false
     }
 
     /// A secret-only item: no address at all (a passphrase for a phone, a Wi-Fi password). Its row shows a key

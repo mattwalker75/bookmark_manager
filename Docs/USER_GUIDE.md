@@ -114,7 +114,10 @@ hidden until you ask for it.
   address, never from https down to plain http (that is reported as "Sent to an unencrypted address"), and never
   sends a password typed into an address. If nothing answers at all (no connection), the last results are kept.
 - After a check, a problem bookmark wears a small red mark on its icon and a red line under its name saying what
-  happened and when. The mark goes when you edit the address or the next check finds it fine.
+  happened and when. The mark goes when you edit the address or the next check finds it fine — or when you
+  **Clear** it in the sheet (or right-click the row → Clear link mark). Clear offers two things: clear this mark
+  once, or clear it and **leave this bookmark out of link checks** from now on, for a site that always turns the
+  check away but works fine in the browser. That switch is in the bookmark's editor too, so it can be undone.
 - **Check all addresses on their own** (Settings → General) is off unless you turn it on: once a week or once a
   month, the app checks quietly a few seconds after launch and puts a line above the list when something didn't
   answer. Nothing else in the app visits a bookmark's full address.

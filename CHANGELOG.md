@@ -5,6 +5,9 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
 ## [0.5.0] — 2026-10-30
 
 ### Added
+- 2026-10-30: **Clear a link mark** — every row in the link sheet (and a marked row's right-click menu) can clear
+  its mark once, or clear it and leave that bookmark out of link checks from then on; the bookmark's editor has
+  the switch (*Leave out of link checks*) so it can be undone. Exports carry it.
 - 2026-10-30: **The new address of a moved link is shown** in full under its row in the link sheet (selectable;
   right-click to copy), with *Open new…* to look at it in the browser before *Use new address* takes it.
 - 2026-10-29: **Secret-only items** (Matt's pick from the tweaks canvas: row A, editor B) — a bookmark can now

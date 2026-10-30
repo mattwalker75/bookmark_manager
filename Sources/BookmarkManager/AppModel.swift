@@ -132,7 +132,7 @@ final class AppModel: ObservableObject {
             return
         }
         let bookmarks = path.flatMap { library.folder(at: $0) }?.allBookmarks ?? library.allBookmarks
-        let items = bookmarks.compactMap { b in b.link.map { (id: b.id, url: $0) } }.filter { ["http", "https"].contains($0.url.scheme ?? "") }
+        let items = bookmarks.filter { !$0.skipLinkCheck }.compactMap { b in b.link.map { (id: b.id, url: $0) } }.filter { ["http", "https"].contains($0.url.scheme ?? "") }
         let scope = path.map { placeName($0) }
         linkProgress = LinkCheckProgress(total: items.count)
         linkNote = nil
@@ -181,6 +181,16 @@ final class AppModel: ObservableObject {
         guard change("The bookmark wasn't saved", { try $0.updateBookmark(b) }) else { return }
         icons.warm(b.url); SecretWindows.refresh(b)
         linkReport?.problems.removeAll { $0.bookmarkId == r.bookmarkId }
+        linkReport?.save(in: store.folder)
+    }
+    /// Clears a bookmark's mark from the last check (Matt, Oct 30 2026): once, or for good — then the bookmark is
+    /// left out of link checks until its editor says otherwise.
+    func clearLinkProblem(_ id: UUID, forever: Bool) {
+        if forever, var b = library.bookmark(id), !b.skipLinkCheck {
+            b.skipLinkCheck = true
+            guard change("The bookmark wasn't saved", { try $0.updateBookmark(b) }) else { return }
+        }
+        linkReport?.problems.removeAll { $0.bookmarkId == id }
         linkReport?.save(in: store.folder)
     }
     /// Show in place from the link sheet: the bookmark's directory, with its row marked.

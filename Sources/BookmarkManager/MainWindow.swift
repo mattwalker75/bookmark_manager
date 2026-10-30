@@ -676,6 +676,10 @@ struct BookmarkRow: View {
                 Button("Copy address") { model.copyAddress(bookmark) }
             }
             if bookmark.hasSecret { Button("Show secret") { model.showSecret(bookmark) } }
+            if problem != nil {
+                Button("Clear link mark") { model.clearLinkProblem(bookmark.id, forever: false) }
+                Button("Clear link mark and leave out of link checks") { model.clearLinkProblem(bookmark.id, forever: true) }
+            }
             Divider()
             Button("Edit…") { model.sheet = .editBookmark(bookmark) }
             Button("Move to…") { model.sheet = .move(.bookmark(bookmark.id)) }

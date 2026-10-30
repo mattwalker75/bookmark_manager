@@ -201,3 +201,54 @@ final class SlowHTTP: @unchecked Sendable {
     }
     func stop() { listener.cancel() }
 }
+
+/// Clearing a link mark (Matt, Oct 30 2026): once, or for good.
+@MainActor
+final class ClearLinkMarkTests: XCTestCase {
+    private var home: URL!
+    override func setUp() async throws {
+        home = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarkmanager-clear-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        setenv("BOOKMARKMANAGER_HOME", home.path, 1)
+    }
+    override func tearDown() async throws { unsetenv("BOOKMARKMANAGER_HOME"); try? FileManager.default.removeItem(at: home) }
+
+    func testClearOnceAndClearForGood() async throws {
+        let server = try SlowHTTP { _, path in (Data("HTTP/1.1 \(path == "/gone" ? "404 Not Found" : "200 OK")\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8), 0) }
+        defer { server.stop() }
+        let m = AppModel(); m.settings.fetchIcons = false; m.icons.enabled = false
+        var lib = Library.fresh()
+        let tab = FolderPath(tab: lib.tabs[0].id)
+        let a = Bookmark(name: "Grumpy site", url: "http://127.0.0.1:\(server.port)/gone")
+        let b = Bookmark(name: "Fine site", url: "http://127.0.0.1:\(server.port)/fine")
+        try lib.addBookmark(a, in: tab); try lib.addBookmark(b, in: tab)
+        m.importFileForTest(lib)
+        m.checkLinks(inMainWindow: false)
+        while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertEqual(m.linkProblems.keys.first, a.id)
+        // once: the mark goes, the next check brings it back
+        m.clearLinkProblem(a.id, forever: false)
+        XCTAssertTrue(m.linkProblems.isEmpty)
+        XCTAssertTrue(LinkReport.load(from: m.store.folder)?.problems.isEmpty ?? false, "saved")
+        XCTAssertFalse(m.library.bookmark(a.id)!.skipLinkCheck)
+        m.checkLinks(inMainWindow: false)
+        while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertEqual(m.linkProblems.keys.first, a.id)
+        // for good: the mark goes, the bookmark is left out of the next check, and the editor can turn it back on
+        m.clearLinkProblem(a.id, forever: true)
+        XCTAssertTrue(m.linkProblems.isEmpty)
+        XCTAssertTrue(m.library.bookmark(a.id)!.skipLinkCheck)
+        m.checkLinks(inMainWindow: false)
+        while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertTrue(m.linkProblems.isEmpty); XCTAssertEqual(m.linkReport?.checked, 1)
+        var back = m.library.bookmark(a.id)!; back.skipLinkCheck = false; m.updateBookmark(back)
+        m.checkLinks(inMainWindow: false)
+        while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertEqual(m.linkProblems.keys.first, a.id)
+        // the flag travels with an export and reads leniently
+        let file = try Transfer.read(try Transfer.export(m.library, includeSecrets: false))
+        XCTAssertFalse(file.library.bookmark(a.id)!.skipLinkCheck)
+        let old = try JSONDecoder().decode(Bookmark.self, from: Data(#"{"name":"x","url":"https://x.example","skipLinkCheck":"yes"}"#.utf8))
+        XCTAssertFalse(old.skipLinkCheck, "a bad value means no")
+    }
+}

@@ -104,6 +104,15 @@ struct LinkReportSheet: View {
                 if b != nil {
                     Button("Show in place") { dismiss(); model.reveal(bookmark: p.bookmarkId); front() }.controlSize(.small).fixedSize()
                     Button("Edit…") { dismiss(); if let b { model.sheet = .editBookmark(b) }; front() }.controlSize(.small).fixedSize()
+                    // Matt, Oct 30 2026: a site may complain and still be wanted — clear the mark, once or for good
+                    Menu("Clear") {
+                        Button("Clear this mark") { model.clearLinkProblem(p.bookmarkId, forever: false) }
+                        Button("Clear it, and leave this bookmark out of link checks") { model.clearLinkProblem(p.bookmarkId, forever: true) }
+                    }
+                    .controlSize(.small).fixedSize().menuStyle(.borderedButton).frame(width: 74)
+                    .help("Take the mark off this bookmark. Leaving it out of checks can be undone in its editor.")
+                } else {
+                    Button("Clear") { model.clearLinkProblem(p.bookmarkId, forever: false) }.controlSize(.small).fixedSize()
                 }
             }
             if case .moved(let to) = p.verdict {

@@ -106,6 +106,8 @@ it is not a developer: every message is a plain sentence.
     launch, `automatic`, and shows a banner instead of the sheet). Review 2: headers only (`bytes` + cancel), redirects
     only to http(s) and never https→http (`.downgraded`), no password ever sent (`bare`, cancelled challenges), a run
     where nothing answered keeps the old report (`linkNote`), Use new address refuses stale rows and non-web targets.
+    **Clear** (Matt, Oct 30 2026): `clearLinkProblem(id, forever:)` drops the mark; `forever` sets `Bookmark.skipLinkCheck`
+    (exported; the editor's "Leave out of link checks" switch undoes it) and `checkLinks` leaves such bookmarks out.
 11. **Files are never lost:** a damaged library.json / unreadable secrets are moved aside (`*.unreadable-<date>`) and
     reported; a damaged library.json takes a COPY of secrets.enc with it (review: the next save would prune them).
     Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json, then the prune — a failed library
