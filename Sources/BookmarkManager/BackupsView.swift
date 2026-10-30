@@ -29,7 +29,7 @@ struct BackupsPane: View {
                 }
                 Picker("When", selection: $model.settings.backupWhen) { ForEach(BackupWhen.allCases) { w in Text(w.label).tag(w) } }
                 Picker("Keep the latest", selection: $model.settings.backupKeep) { ForEach([5, 7, 14, 30, 90], id: \.self) { n in Text("\(n) backups").tag(n) } }
-                Text("A backup is one file holding everything — tabs, directories, bookmarks, color codes and the secrets — written only when something changed since the last one. Older backups fall off the end; the ones you mark as kept never do. Back up into a folder your Mac already copies elsewhere (iCloud Drive, Time Machine, Data Syncer) and you have it off this disk too.")
+                Text("A backup is one file holding everything — tabs, directories, bookmarks, color codes and the secrets — written only when something changed since the last one. Older backups fall off the end; the ones you mark as kept never do. Back up into a folder your Mac already copies elsewhere (iCloud Drive, Time Machine, Data Syncer) and you have it off this disk too. Switched off, nothing is written on its own; Back up now and the safety backup before a restore still work.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
             .disabled(false)
@@ -49,8 +49,12 @@ struct BackupsPane: View {
                     Button("Save a copy of the secret key…") { saveKey() }
                     Button("Show the key in Finder") { NSWorkspace.shared.activateFileViewerSelecting([model.store.secrets.keyURL]) }
                 }
+                if model.backupPassphraseStale {
+                    Text("The passphrase was set for a secret key this Mac no longer has (the key was replaced), so new backups don't carry it. Set it again.")
+                        .font(DS.secondary).foregroundStyle(Theme.problem)
+                }
                 HStack(spacing: 8) {
-                    Text(model.settings.backupPassphrase == nil ? "No passphrase set." : "A passphrase is set: backups also open with it.")
+                    Text(model.settings.backupPassphrase == nil ? "No passphrase set." : model.backupPassphraseStale ? "A passphrase is set, but it no longer matches." : "A passphrase is set: backups also open with it.")
                     Spacer()
                     Button(model.settings.backupPassphrase == nil ? "Set a passphrase…" : "Change…") { passphraseSheet = true }
                     if model.settings.backupPassphrase != nil { Button("Remove") { model.clearBackupPassphrase() } }
@@ -67,7 +71,7 @@ struct BackupsPane: View {
                     Button("Show in Finder") { try? FileManager.default.createDirectory(at: model.backupStore.folder, withIntermediateDirectories: true); NSWorkspace.shared.activateFileViewerSelecting([model.backupStore.folder]) }
                 }
                 if model.backups.isEmpty {
-                    Text("No backups yet. The first one is written on the next launch (or quit), or now with Back up now.").font(DS.secondary).foregroundStyle(.secondary)
+                    Text("No backups here. One is written on the next launch or quit, or now with Back up now.").font(DS.secondary).foregroundStyle(.secondary)
                 }
                 ForEach(model.backups) { e in row(e) }
                 if let message { Text(message).font(DS.secondary).foregroundStyle(messageIsProblem ? Theme.problem : Color.secondary).fixedSize(horizontal: false, vertical: true) }

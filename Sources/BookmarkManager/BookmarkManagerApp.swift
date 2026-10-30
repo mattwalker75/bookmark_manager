@@ -21,7 +21,7 @@ struct BookmarkManagerApp: App {
                     model.addSampleIfAsked()
                     model.runScheduledLinkCheckIfDue()
                     model.backupAtLaunchIfDue()
-                    AppDelegate.beforeQuit = { model.backupOnQuit() }
+                    AppDelegate.beforeQuit = { model.backupOnQuit() }   // the problem sentence, when the backup failed
                 }
         }
         .defaultSize(width: 1180, height: 760)
@@ -82,11 +82,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // a plain utility: closing its last window quits it
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { true }
 
-    /// Runs just before the app quits (the "when the app quits" backup).
-    static var beforeQuit: (() -> Void)?
+    /// Runs just before the app quits (the "when the app quits" backup); answers a sentence when it could not be written.
+    static var beforeQuit: (() -> String?)?
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        AppDelegate.beforeQuit?()
-        return .terminateNow
+        guard let problem = AppDelegate.beforeQuit?() else { return .terminateNow }
+        // the person decides (review 2: a failed quit-time backup used to vanish with the app)
+        let a = NSAlert()
+        a.messageText = "The backup before quitting could not be written"
+        a.informativeText = problem + " Quit anyway, or cancel and fix the backups folder in Settings → Backups."
+        a.addButton(withTitle: "Cancel")
+        a.addButton(withTitle: "Quit Anyway")
+        return a.runModal() == .alertFirstButtonReturn ? .terminateCancel : .terminateNow
     }
 
     /// The Dock icon clicked while only a secret window is open: the main window comes back.

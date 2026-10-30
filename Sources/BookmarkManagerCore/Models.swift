@@ -171,6 +171,13 @@ public struct Library: Codable, Equatable, Sendable {
     }
     /// A new library: one tab, the four default colors.
     public static func fresh() -> Library { Library(tabs: [Folder(name: "Bookmarks")]) }
+    /// Nothing of the person's in it yet: one empty tab called Bookmarks, the default colors, the default levels
+    /// (a restore over this needs no safety backup; anything else does — review 2).
+    public var isFresh: Bool {
+        let d = ColorCode.defaults()
+        return tabs.count == 1 && tabs[0].isEmpty && tabs[0].name == "Bookmarks" && maxDepth == 2
+            && colors.count == d.count && zip(colors, d).allSatisfy { $0.name == $1.name && $0.rgb == $1.rgb }
+    }
 
     enum CodingKeys: String, CodingKey { case version, maxDepth, colors, tabs }
     public init(from d: Decoder) throws {

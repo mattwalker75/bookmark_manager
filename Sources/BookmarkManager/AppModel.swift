@@ -309,16 +309,22 @@ final class AppModel: ObservableObject {
     /// Returns a sentence about what happened, or nil when it was skipped because nothing changed.
     @discardableResult
     func backUp(reason: BackupReason, force: Bool = false, kept: Bool = false, note: String = "") -> String? {
+        // a launch that lost its secrets or its library must not push good backups out of the rotation (review 2)
+        if loadTrouble, !force { return nil }
         let digest = Backup.digest(library)
         if !force, digest == settings.lastBackupDigest { return nil }
         do {
             let key = try store.secrets.currentKey() ?? (library.allBookmarks.contains(where: \.hasSecret) ? try store.secrets.ensureKey() : nil)
-            let data = try Backup.make(library, key: key, passphrase: settings.backupPassphrase, reason: reason, kept: kept, note: note, secretsInClear: settings.backupSecretsPlain)
+            // a passphrase set before this Mac's key was replaced would open nothing: left out, and the pane says so
+            let wrap = settings.backupPassphrase.flatMap { w in key.map { w.matches($0) } == false ? nil : w }
+            let data = try Backup.make(library, key: key, passphrase: wrap, reason: reason, kept: kept, note: note, secretsInClear: settings.backupSecretsPlain)
             let url = try backupStore.write(data, at: Date())
             settings.lastBackupDigest = digest; settings.lastBackupAt = Date()
             backupStore.prune(keep: settings.backupKeep)
             refreshBackups()
-            return "Backed up to \(url.lastPathComponent)."
+            var said = "Backed up to \(url.lastPathComponent)."
+            if loadTrouble { said += " This launch loaded without its secrets (or its bookmarks), so this backup holds what you see now, no more." }
+            return said
         } catch {
             let why = (error as? BMError)?.message ?? error.localizedDescription
             notice = Notice(title: "The backup could not be written", message: why)
@@ -334,16 +340,28 @@ final class AppModel: ObservableObject {
         guard settings.backupsEnabled, [.daily, .dailyAndQuit].contains(settings.backupWhen), backupIsDue else { return }
         backUp(reason: .daily)
     }
-    /// After a save: the "after every change" setting, at most once an hour.
+    private var lastBackupTry: Date?
+    /// After a save: the "after every change" setting, at most once an hour — tried or not (a folder that can't be
+    /// written is complained about once an hour, not on every change).
     private func backupAfterChangeIfDue() {
         guard settings.backupsEnabled, settings.backupWhen == .everyChange else { return }
         if let last = settings.lastBackupAt, Date().timeIntervalSince(last) < 3_600 { return }
+        if let tried = lastBackupTry, Date().timeIntervalSince(tried) < 3_600 { return }
+        lastBackupTry = Date()
         backUp(reason: .change)
     }
-    /// When the app quits: the "and when the app quits" setting, if something changed.
-    func backupOnQuit() {
-        guard settings.backupsEnabled, settings.backupWhen == .dailyAndQuit else { return }
-        backUp(reason: .quit)
+    /// When the app quits: the "and when the app quits" setting, if something changed. Returns the problem when
+    /// the backup could not be written, so the quit can be held up and the person told.
+    @discardableResult
+    func backupOnQuit() -> String? {
+        guard settings.backupsEnabled, settings.backupWhen == .dailyAndQuit else { return nil }
+        guard let said = backUp(reason: .quit), !said.hasPrefix("Backed up") else { return nil }
+        return said
+    }
+    /// The passphrase was set for a key this Mac no longer has (the key was replaced after unreadable secrets).
+    var backupPassphraseStale: Bool {
+        guard let w = settings.backupPassphrase, let k = try? store.secrets.currentKey() else { return false }
+        return !w.matches(k)
     }
     func setKept(_ e: BackupEntry, kept: Bool, note: String) {
         do { try backupStore.setKept(e.url, kept: kept, note: note) } catch { notice = Notice(title: "The backup wasn't marked", message: (error as? BMError)?.message ?? error.localizedDescription) }
@@ -352,6 +370,8 @@ final class AppModel: ObservableObject {
     func deleteBackup(_ e: BackupEntry) {
         do { try FileManager.default.removeItem(at: e.url) } catch { notice = Notice(title: "The backup wasn't deleted", message: error.localizedDescription) }
         refreshBackups()
+        // nothing left: the next launch or quit writes one again, changed or not
+        if !backups.contains(where: \.readable) { settings.lastBackupDigest = nil }
     }
     /// Verify: with this Mac's key, a key file chosen, or a passphrase typed.
     func checkBackup(at url: URL, keyFile: URL? = nil, passphrase: String? = nil) -> Result<BackupCheck, BMError> {
@@ -369,16 +389,31 @@ final class AppModel: ObservableObject {
         } else {
             key = try? store.secrets.currentKey()
         }
-        return Backup.check(data, at: url, key: key, openedWith: how)
+        let result = Backup.check(data, at: url, key: key, openedWith: how)
+        // a key file or passphrase that opened a key, but not the key these secrets were sealed with: say so, not "can't restore"
+        if keyFile != nil || passphrase != nil, case .success(let c) = result, c.hasSecrets, !c.secretsReadable {
+            return .failure(BMError(passphrase != nil
+                ? "The passphrase opened a key, but it isn't the key these secrets were sealed with — the passphrase was set before that Mac's key changed. Use the key file instead."
+                : "\(keyFile!.lastPathComponent) isn't the key these secrets were sealed with. Try another copy of secret.key, or the passphrase."))
+        }
+        return result
     }
     /// Restore: a kept backup of "now" first, then the backup's library (its secrets re-sealed with this Mac's key).
     func restoreBackup(_ check: BackupCheck) -> String {
         guard check.canRestore else { return "This backup can't be restored as it is." }
-        if !library.allBookmarks.isEmpty || library.tabs.count > 1 {
-            backUp(reason: .beforeRestore, force: true, kept: true, note: "Before restoring \(check.url.lastPathComponent)")
+        // the safety backup is a must, not a wish (review 2): without it nothing is replaced
+        if !library.isFresh {
+            let said = backUp(reason: .beforeRestore, force: true, kept: true, note: "Before restoring \(check.url.lastPathComponent)")
+            guard said?.hasPrefix("Backed up") == true else {
+                return "Nothing was restored: the safety backup of what is here now could not be written. \(said ?? "") Fix the backups folder in Settings → Backups and try again."
+            }
         }
         let lib = Backup.library(check.file, secrets: check.secrets)
+        let before = library
         let notes = importFile(ExportFile(secretsIncluded: true, library: lib), mode: .replace)
+        if library == before, lib != before {
+            return "Nothing was restored: \(notice?.message ?? "the bookmarks could not be saved.")"
+        }
         settings.lastBackupDigest = Backup.digest(library)
         refreshBackups()
         var s = "Restored \(check.file.counts.text) from \(check.url.lastPathComponent)."
@@ -498,10 +533,14 @@ final class AppModel: ObservableObject {
 
     /// Shows the secret window — after Touch ID (or the Mac's password) when Settings asks for it; one check
     /// covers the next minute, so opening three secrets in a row asks once.
+    private var gateBusy = false
     func showSecret(_ b: Bookmark) {
         guard settings.touchIDForSecrets, !SecretGate.recentlyPassed, !SecretWindows.isOpen(b.id) else { SecretWindows.show(b, model: self); return }
+        guard !gateBusy else { return }   // one prompt at a time (Space twice)
+        gateBusy = true
         SecretGate.check(reason: "show the secret for “\(b.name)”") { [weak self] passed, problem in
             guard let self else { return }
+            self.gateBusy = false
             if passed { SecretWindows.show(b, model: self) }
             else if let problem { self.notice = Notice(title: "The secret stays hidden", message: problem) }
         }
@@ -622,7 +661,11 @@ struct AppSettings: Codable, Equatable {
         guard let data = try? Data(contentsOf: url), let s = try? d.decode(AppSettings.self, from: data) else { return AppSettings() }
         return s
     }
-    func save() { if let data = try? AppSettings.encoder.encode(self) { try? data.write(to: AppSettings.url, options: .atomic) } }
+    func save() {
+        guard let data = try? AppSettings.encoder.encode(self) else { return }
+        try? data.write(to: AppSettings.url, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: AppSettings.url.path)   // it holds the passphrase wrap
+    }
 }
 
 /// When backups are written on their own.

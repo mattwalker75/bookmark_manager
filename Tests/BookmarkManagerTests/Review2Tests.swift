@@ -17,7 +17,7 @@ final class Review2Tests: XCTestCase {
 
     func testTheQuitHookIsWhatTheDelegateRuns() {
         var ran = 0
-        AppDelegate.beforeQuit = { ran += 1 }
+        AppDelegate.beforeQuit = { ran += 1; return nil }
         defer { AppDelegate.beforeQuit = nil }
         XCTAssertEqual(AppDelegate().applicationShouldTerminate(NSApplication.shared), .terminateNow)
         XCTAssertEqual(ran, 1)

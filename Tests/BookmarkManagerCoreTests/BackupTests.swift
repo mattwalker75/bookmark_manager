@@ -31,7 +31,7 @@ final class BackupTests: XCTestCase {
     func testThePassphraseOpensTheKeyAndTheWrongOneDoesNot() throws {
         let key = SymmetricKey(size: .bits256)
         XCTAssertThrowsBM(try PassphraseWrap.make(key: key, passphrase: "short"), containing: "at least 8")
-        let wrap = try PassphraseWrap.make(key: key, passphrase: "sierra nevada 1987", rounds: 2_000)
+        let wrap = try PassphraseWrap.make(key: key, passphrase: "sierra nevada 1987", rounds: PassphraseWrap.fewestRounds)
         XCTAssertEqual(try wrap.unwrap(passphrase: "sierra nevada 1987"), key)
         XCTAssertThrowsBM(try wrap.unwrap(passphrase: "sierra nevada 1988"), containing: "doesn't open")
         // through a backup: the secrets open with the passphrase alone, no key file

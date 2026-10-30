@@ -31,20 +31,35 @@ public struct PassphraseWrap: Codable, Equatable, Sendable {
     public var wrapped: Data
     public var salt: Data
     public var rounds: Int
+    /// which key is inside (a fingerprint, not the key): a wrap made before this Mac's key was replaced is stale
+    public var keyFingerprint: String?
 
     public static let defaultRounds = 600_000
+    /// fewer rounds than this are refused on making a wrap; an older or edited file is read down to `leastRounds`
+    public static let fewestRounds = 100_000
+    public static let leastRounds = 10_000
+
+    public static func fingerprint(_ key: SymmetricKey) -> String {
+        String(SHA256.hash(data: key.withUnsafeBytes { Data($0) }).map { String(format: "%02x", $0) }.joined().prefix(16))
+    }
+    /// True when this wrap holds `key` (an old wrap without a fingerprint is given the benefit of the doubt).
+    public func matches(_ key: SymmetricKey) -> Bool { keyFingerprint == nil || keyFingerprint == PassphraseWrap.fingerprint(key) }
 
     public static func make(key: SymmetricKey, passphrase: String, rounds: Int = defaultRounds) throws -> PassphraseWrap {
         guard passphrase.count >= 8 else { throw BMError("The passphrase needs at least 8 characters.") }
+        guard rounds >= fewestRounds, rounds <= Int(UInt32.max) else { throw BMError("The passphrase settings are out of range.") }
         var salt = Data(count: 16)
-        _ = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
+        let status = salt.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
+        guard status == errSecSuccess else { throw BMError("This Mac could not make the random salt the passphrase needs.") }
         let kek = try derive(passphrase: passphrase, salt: salt, rounds: rounds)
         let raw = key.withUnsafeBytes { Data($0) }
         guard let combined = try AES.GCM.seal(raw, using: kek).combined else { throw BMError("The key could not be sealed.") }
-        return PassphraseWrap(wrapped: combined, salt: salt, rounds: rounds)
+        return PassphraseWrap(wrapped: combined, salt: salt, rounds: rounds, keyFingerprint: fingerprint(key))
     }
 
     public func unwrap(passphrase: String) throws -> SymmetricKey {
+        // a crafted file must not crash the app (review 2: a negative or huge rounds trapped in UInt32())
+        guard rounds >= PassphraseWrap.leastRounds, rounds <= Int(UInt32.max), salt.count >= 8 else { throw BMError("This backup's passphrase settings are damaged, so the passphrase can't be used. The key file still opens it.") }
         let kek = try PassphraseWrap.derive(passphrase: passphrase, salt: salt, rounds: rounds)
         do {
             let raw = try AES.GCM.open(AES.GCM.SealedBox(combined: wrapped), using: kek)
@@ -55,7 +70,8 @@ public struct PassphraseWrap: Codable, Equatable, Sendable {
 
     static func derive(passphrase: String, salt: Data, rounds: Int) throws -> SymmetricKey {
         var out = [UInt8](repeating: 0, count: 32)
-        let pw = Array(passphrase.utf8)
+        // the same words typed with a differently composed accent are the same passphrase
+        let pw = Array(passphrase.precomposedStringWithCanonicalMapping.utf8)
         let status = salt.withUnsafeBytes { s -> Int32 in
             pw.withUnsafeBufferPointer { p in
                 CCKeyDerivationPBKDF(CCPBKDFAlgorithm(kCCPBKDF2), UnsafeRawPointer(p.baseAddress!).assumingMemoryBound(to: CChar.self), pw.count,
