@@ -148,7 +148,8 @@ if [[ $COPY -eq 1 ]]; then
   echo; echo "Next:  open \"$TARGET\""
   [[ "$DEST" == "/Applications" ]] && echo "       (or find $APP_NAME in Launchpad)"
   echo "       To use it on another Mac, copy the whole \"$APP_NAME.app\" over, or install it there the same way,"
-  echo "       then move your bookmarks with Settings → Export & import. Build with --universal if the other Mac has"
+  echo "       then move your bookmarks with Settings → Backups (a backup file + the key file or a passphrase; Restore"
+  echo "       from a file… on the other Mac). Build with --universal if the other Mac has"
   echo "       a different kind of chip; see Docs/SCRIPTS.md for the one-time \"Open Anyway\" step macOS asks for."
 else
   echo; echo "Next:  open \"$HERE/build/$APP_NAME.app\""

@@ -8,7 +8,7 @@ hidden until you ask for it.
 
 ## Tabs
 - The tabs run across the top of the window. There is always at least one; a new library starts with a tab called
-  *Bookmarks* — rename it with **Rename tab…** (bottom of the folder tree, or right-click the tab).
+  *Bookmarks* — rename it with **Rename tab…** (bottom of the folder tree, or right-click the tab → Rename…).
 - **+** at the right of the tab bar (or ⌘T) makes a new tab. Drag a tab along the bar to reorder; right-click for
   Rename, New directory, Move left / right, Delete.
 - A tab can only be deleted when it is **empty** — no bookmarks, no directories — and never the last one.
@@ -46,7 +46,7 @@ hidden until you ask for it.
   - **Tags** — optional words, separated by commas, for the search only. They never show on the row.
   - **Opens in** — the browser from Settings unless you pick one of the installed browsers here, for the odd site
     that only behaves in one of them. Set it and forget it: the row shows nothing about it. If that browser is
-    removed later, the bookmark opens in the Settings browser and says so once.
+    removed later, the bookmark opens in the Settings browser and says so once per launch.
   - **Color** — one of the color codes from Settings; the row gets a light wash of that color.
   - **Secret** — tick *This bookmark has a secret* and type as many lines as you like (a user name, a password, a
     recovery address, a token, blank lines between for reading). It is kept encrypted on this Mac.
@@ -68,7 +68,8 @@ hidden until you ask for it.
   no Copy button on purpose: a secret usually holds several things.
 - **Hide** closes the window. Closing it any other way does the same. **Edit bookmark…** opens the editor.
 - A secret window also **hides itself** after a while without being used — 5 minutes unless you change it in
-  Settings → General (1 to 30 minutes, or Never). Clicking into the window starts the clock again.
+  Settings → General (1 to 30 minutes, or Never). Any click, key or scroll in the window counts as using it; a
+  window you are working in never closes under you, one you left behind does.
 - Settings → General can **ask for Touch ID** (or your Mac's password) before a secret is shown. One check covers
   the next minute, so opening several secrets in a row asks once. Turn it off there whenever you like.
 - Secrets never go into the bookmarks file, and go into an export only when you tick the box (see Export).
@@ -105,7 +106,12 @@ hidden until you ask for it.
   **moved** (the site says it has a new address — *Use new address* takes it), and **didn't answer** (no such site,
   timed out, a server error, or a login page or robot block — those can still work fine in your browser). Show in
   place and Edit… are right there.
-- Right-click a directory → **Check links in this directory…** does the same for just that directory.
+- Right-click a directory → **Check links in this directory…** (or a tab → **Check links in this tab…**) does the
+  same for just that part; the Bookmarks menu has **Check Links in This Directory…** and **Check Every Address…**.
+  The sheet has **Stop** while it runs and **Check again** after; Settings → General keeps **Last results…**.
+- The check reads only each page's headers, never the page; it follows a site's "moved" only to another web
+  address, never from https down to plain http (that is reported as "Sent to an unencrypted address"), and never
+  sends a password typed into an address. If nothing answers at all (no connection), the last results are kept.
 - After a check, a problem bookmark wears a small red mark on its icon and a red line under its name saying what
   happened and when. The mark goes when you edit the address or the next check finds it fine.
 - **Check all addresses on their own** (Settings → General) is off unless you turn it on: once a week or once a
@@ -120,11 +126,12 @@ hidden until you ask for it.
 
 ## Settings
 - **General** — *Open bookmarks in*: the Mac's default browser (whatever app that is), or any browser installed
-  on this Mac. *Directory
-  levels inside a tab*. *Fetch site icons* (off = no network at all; icons already fetched still show). Where
-  the files are kept, with Show in Finder.
+  on this Mac. *Directory levels inside a tab*. **Secrets**: how long a secret window stays, and Touch ID before a
+  secret. **Links**: Check every address…, Last results…, and the schedule. *Fetch site icons* (off = no network
+  for icons; icons already fetched still show). Where the files are kept, with Show in Finder.
 - **Color codes** — above.
 - **Appearance** — Light / Dark / Follow the system, the accent color, and themes of your own.
+- **Backups** — above.
 - **Export & import** — below.
 
 ## Export, validate and import
@@ -147,14 +154,22 @@ hidden until you ask for it.
   levels and the secrets — written into the Backups folder beside your bookmarks (or any folder you choose:
   iCloud Drive, a Data Syncer folder) only when something changed since the last one.
 - **When:** every day · every day and when the app quits (the usual) · after every change, at most once an hour ·
-  only when you click **Back up now**. **Keep the latest** 5 to 90; older ones fall off the end — except the ones
-  you mark **Keep…** (with a note, if you like: "before the big re-sort"), which stay for good.
+  only when you click **Back up now**. "Every day" is looked at when the app launches and then once an hour while
+  it stays open. **Keep the latest** 5 to 90; older ones fall off the end — except the ones you mark **Keep…**
+  (with a note, if you like: "before the big re-sort"), which stay for good. **Unkeep** asks first when the backup
+  would be deleted at the next backup; the trash button deletes one file after asking. With backups switched off
+  nothing is written on its own, but Back up now and the safety backup before a restore still work.
 - **Verify…** on any backup reads it right through and says what it holds and whether its secrets open.
   **Restore…** (from the Verify sheet) replaces everything here with what the backup holds; a kept backup of the
-  way things were is written first, so a restore can itself be undone.
+  way things were is written first, so a restore can itself be undone — and if that safety backup can't be
+  written, nothing is restored. (Only a library with nothing of yours in it yet skips the safety backup.)
+- If the app couldn't read its secrets or its bookmarks when it launched, it writes no automatic backup that day,
+  so a good backup is never pushed out by an empty one. A failed backup at quit time asks whether to quit anyway.
 - **The secrets inside** are sealed with this Mac's secret key, the same as on disk. So: **Save a copy of the
-  secret key…** once, somewhere safe (a password manager, a USB stick). Optionally **set a passphrase**; from then
-  on each backup also opens with the words alone.
+  secret key…** once, somewhere safe (a password manager, a USB stick); **Show the key in Finder** finds it.
+  Optionally **set a passphrase**; from then on each backup also opens with the words alone. If this Mac's key is
+  ever replaced (that happens when the secrets file was unreadable), the pane says the passphrase no longer
+  matches and asks you to set it again.
 - **Written as** can instead be **Plain text** — then every secret is written in the clear in each backup from
   then on, readable by anyone who has the file (or a copy Time Machine or iCloud makes of it). Off unless you
   choose it; the pane says so in red while it is on. Such a backup restores on any Mac with no key or passphrase.
@@ -170,6 +185,7 @@ sentence saying so, and nothing is lost: quit the other copy, then quit and reop
 
 ## Where things are kept
 `~/Library/Application Support/Bookmark Manager/` — `library.json` (the bookmarks, no secrets), `secrets.enc`
-and `secret.key` (the secrets, encrypted; the key is readable by you only), `settings.json`, `icons/`. A damaged
+and `secret.key` (the secrets, encrypted; the key is readable by you only), `settings.json`, `icons/`,
+`linkcheck.json` (the last link check) and `Backups/` (unless you chose another folder). A damaged
 bookmarks or secrets file is moved aside with the date in its name (the secrets are kept beside a damaged
 bookmarks file), never overwritten; a damaged settings file is ignored and replaced.

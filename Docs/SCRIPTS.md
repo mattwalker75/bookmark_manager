@@ -52,8 +52,9 @@ example for a firewall rule), sign with a certificate of your own:
 
 The finished `Bookmark Manager.app` is self-contained: copy the whole app to the other Mac (AirDrop, a USB
 drive, a share) and open it. It needs macOS 14 or newer and nothing else installed. Move your bookmarks with
-Settings → Export & import (tick *Include the secrets* if the other Mac should have them, and treat that file
-with care).
+Settings → Backups: take a backup file and a copy of the secret key (or set a passphrase first), then on the other
+Mac Settings → Backups → Restore from a file… — the secrets travel sealed. (Export & import also works; tick
+*Include the secrets* there and treat that file with care, it is plain text.)
 
 - **Chips:** a normal build is for the kind of Mac that made it (Apple silicon or Intel). For a Mac with the
   other kind, build with `--universal`; that app runs on both.

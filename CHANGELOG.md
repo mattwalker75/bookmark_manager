@@ -70,10 +70,28 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   file…; Import… with Add its tabs / Replace everything, confirmed).
 - 2026-10-28: **Site icons** fetched once per host (the page's own link tags, then /favicon.ico), kept as 64 px PNG,
   the link glyph when none; can be turned off.
+- 2026-10-29: **Dev hooks** — `newSecret`, `secret:<name>`, `keys:<codes>`, steps joined by `;`, `linkreport`,
+  `linkreport:sheet`, `linkcheck`, `backupcheck`, `settings:backups`; the test suite grew to 126 (a test HTTP server
+  on 127.0.0.1 for the link checker; no test can reach the real data folder).
 - 2026-10-28: **Scripts, icon, docs** — BUILD_APP.sh / INSTALL_APP.sh as in App Starter; icon 2 "Tabbed folder"
   rendered by make_icns.sh without a browser; user guide, scripts and development docs; 48 tests.
 
 ### Fixed
+- 2026-10-30: **Review 2** (four parallel reviewers over the Oct 29 work; verified findings only, each with a test):
+  *secrets & backups* — Restore now refuses to go on when its safety backup can't be written and says "Nothing was
+  restored" when the save was refused; a launch that couldn't read its secrets or bookmarks writes no automatic
+  backup; a passphrase set for a key this Mac no longer has is noticed and left out; a crafted backup file can't
+  crash the app; a failed quit-time backup holds the quit; settings.json is readable by you only.
+  *link checker* — only headers are read, never a page (a 50 MB page used to cost 50 MB); redirects are followed
+  only to web addresses and never from https down to http; a password typed into an address is never sent; a
+  stopped run or one where nothing answered keeps the last results; Use new address refuses stale rows and
+  non-web targets; plain words for redirect loops and odd answers.
+  *window* — the arrow-key focus follows the rows; Show in place scrolls to the row; a secret window's hide clock
+  runs on real use; a long one-line secret opens tall enough; the editor's refusal is visible; the whole tree
+  row selects; buttons never truncate; the main window and Settings are tall enough for their sheets and panes;
+  Unkeep and Remove passphrase ask first.
+  *settings* — one wrongly typed value no longer resets every setting. *docs* — README, the user guide and the
+  development notes brought up to date with everything added on Oct 29.
 - 2026-10-30: **A test was writing the real settings file.** The browser-choice test built an AppModel without a
   scratch home, so every `swift test` (and every install) reset "Fetch site icons" and "Open bookmarks in" in the
   real settings.json. The test has its own scratch home now, and `Home.folder()` refuses the real folder whenever

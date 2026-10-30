@@ -17,13 +17,16 @@ it is not a developer: every message is a plain sentence.
   - `Arrange.swift` — `Library.move(DragItem, to:before:)`: the ONE function for drag/drop and Move to…
   - `Search.swift` — `Library.search` (names, addresses, tags; directory names) → `SearchHit` with its path.
   - `Store.swift` (library.json, Home, `BOOKMARKMANAGER_HOME`), `SecretBox.swift` (AES-GCM secrets.enc + secret.key),
-    `Transfer.swift` (export / `validate` / `apply` import), `Favicons.swift` (where a site's icon is; no network).
+    `Transfer.swift` (export / `validate` / `apply` import), `Favicons.swift` (where a site's icon is; no network),
+    `Backup.swift` (BackupFile, PassphraseWrap, Backup.make/read/check, BackupStore).
 - `Sources/BookmarkManager/` — the app. `AppModel` drives the core (every change goes through `change { }`, which
   turns a refusal into a `Notice` and saves on success). `MainWindow` (SearchBar, TabBar, FolderTree, FolderDetail,
   BookmarkRow, SubfolderRow, drag/drop helpers), `SearchResults`, `Editors` (BookmarkEditor, FolderEditor,
-  TabNameSheet, MoveSheet, ColorPills, DestinationPicker), `SecretWindow` (one NSWindow per bookmark),
-  `SettingsView` (General, Color codes, Appearance, Export & import + ValidationSheet), `Browsers`, `Icons`
-  (IconCache + IconFetcher), `Sample`. The look is App Starter's / Data Syncer's: `Design.swift`, `Themes.swift`,
+  TabNameSheet, MoveSheet, ColorPills, DestinationPicker, BrowserPicker), `SecretWindow` (one NSWindow per bookmark,
+  self-sizing, hide timer), `SecretGate` (Touch ID), `LinkCheck` + `LinkCheckView` (the link check and its sheet /
+  banner), `SettingsView` (General, Color codes, Appearance, Backups, Export & import + ValidationSheet),
+  `BackupsView` (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet), `Browsers`, `Icons` (IconCache +
+  IconFetcher), `Sample`. `MainWindow` also holds `KeyboardDriver`, `TreeBranch`, `TreeRow`. The look is App Starter's / Data Syncer's: `Design.swift`, `Themes.swift`,
   `AppearancePane.swift`, `PlainTextField.swift` are adapted copies (Themes adds `RGB.color`, drops the bundle light;
   AppearancePane reworded), `TextBox.swift` is ScriptEditor renamed — keep them in step.
 - `Tests/BookmarkManagerCoreTests/` — XCTest against throwaway folders (`Scratch`) and a fixed `Sample` library.
@@ -97,9 +100,12 @@ it is not a developer: every message is a plain sentence.
     **The link check is the ONE deliberate full-address visit** (Matt, Oct 29 2026, mockup B): `LinkChecker` HEAD then
     GET (on 400/403/405/501), 5 at once, 8 s each, any certificate, first permanent redirect remembered; verdicts
     `LinkVerdict` (gone / moved / refused / failed / unreachable) kept in `linkcheck.json`; a row's mark applies only
-    while its url is unchanged; a one-directory check merges into the old report; it runs ONLY by the Settings
-    button, the directory menu, the Bookmarks menu, or the schedule `linkCheckDays` (default 0 = never; a due check
-    runs 5 s after launch, `automatic`, and shows a banner instead of the sheet).
+    while its url is unchanged; a one-directory check (or a stopped run) merges into the old report, keeping
+    `scope`; it runs ONLY by the Settings button, the directory / tab menus, the Bookmarks menu, the sheet's Check
+    again, the `linkcheck` dev hook, or the schedule `linkCheckDays` (default 0 = never; a due check runs 5 s after
+    launch, `automatic`, and shows a banner instead of the sheet). Review 2: headers only (`bytes` + cancel), redirects
+    only to http(s) and never https→http (`.downgraded`), no password ever sent (`bare`, cancelled challenges), a run
+    where nothing answered keeps the old report (`linkNote`), Use new address refuses stale rows and non-web targets.
 11. **Files are never lost:** a damaged library.json / unreadable secrets are moved aside (`*.unreadable-<date>`) and
     reported; a damaged library.json takes a COPY of secrets.enc with it (review: the next save would prune them).
     Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json, then the prune — a failed library
@@ -110,8 +116,10 @@ it is not a developer: every message is a plain sentence.
     the file) / `prune(keep:)` (never a kept one, never an unreadable file). `AppModel.backUp` skips when
     `Backup.digest` is unchanged unless forced; schedule `BackupWhen` (default daily + quit, `AppDelegate.beforeQuit`);
     "Enable backups" is the label (Matt). Verify = `Backup.check` (Validate's checks + can the secrets open);
-    Restore writes a KEPT "before restore" backup first, then goes through `importFile(.replace)` so the secrets are
-    re-sealed with the current key. Fresh-Mac path: Restore from a file… → asks for the key file or the passphrase.
+    Restore writes a KEPT "before restore" backup first (skipped only for a fresh library, `Library.isFresh`) and
+    REFUSES to go on without it, then goes through `importFile(.replace)` so the secrets are re-sealed with the
+    current key, and says "Nothing was restored" when that save was refused. Automatic backups stand down while
+    `loadTrouble`; a failed quit-time backup holds the quit; `PassphraseWrap.keyFingerprint` keeps a stale wrap out. Fresh-Mac path: Restore from a file… → asks for the key file or the passphrase.
     "Save a copy of the secret key…" exists for that day. NO password generator anywhere. **Plain-text backups**
     (Matt, Oct 30 2026): `backupSecretsPlain` / `Backup.make(secretsInClear:)` writes the secrets in the clear inside
     `library` and sets `secretsInClear` on the file (`Backup.library` then returns it as is); default OFF, red text
