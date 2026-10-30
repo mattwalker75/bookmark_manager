@@ -48,13 +48,21 @@ struct MainWindow: View {
         }
         .alert(item: $model.notice) { n in Alert(title: Text(n.title), message: Text(n.message), dismissButton: .default(Text("OK"))) }
         .onAppear(perform: developmentHooks)
+        .onAppear { KeyboardDriver.install(model) }
     }
 
     /// Development only, harmless when unset (for trying screens on a scratch BOOKMARKMANAGER_HOME):
     /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|search:<text>|settings[:tab]
     private func developmentHooks() {
-        guard let sheet = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_AUTOSHEET"] else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+        guard let hooks = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_AUTOSHEET"] else { return }
+        // several steps separated by ";" run a second apart: "search:admin;keys:125,125,36"
+        for (i, step) in hooks.split(separator: ";").map(String.init).enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1 + Double(i)) { developmentStep(step) }
+        }
+    }
+
+    private func developmentStep(_ sheet: String) {
+        do {
             let b = model.library.allBookmarks.first { $0.hasSecret } ?? model.library.allBookmarks.first
             let f = model.library.allFolders.first
             switch sheet {
@@ -69,6 +77,14 @@ struct MainWindow: View {
             default:
                 if sheet.hasPrefix("secret:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(7))) }) { model.showSecret(b) }
                 if sheet.hasPrefix("search:") { model.query = String(sheet.dropFirst(7)) }
+                if sheet.hasPrefix("keys:"), let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
+                    // key codes (125 ↓, 126 ↑, 36 Return, 49 Space) posted to the window like real key presses
+                    for code in sheet.dropFirst(5).split(separator: ",").compactMap({ UInt16($0) }) {
+                        if let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: w.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code) {
+                            NSApp.postEvent(e, atStart: false)
+                        }
+                    }
+                }
                 if sheet.hasPrefix("settings") {
                     model.settingsTab = sheet.split(separator: ":").dropFirst().first.map(String.init) ?? "general"
                     NSApp.activate(ignoringOtherApps: true)
@@ -79,6 +95,44 @@ struct MainWindow: View {
                     w.makeKeyAndOrderFront(nil)
                 }
             }
+        }
+    }
+}
+
+// MARK: - the keyboard
+
+/// ↑ ↓ walk the rows of the page (or the search hits), Return opens the row under them, Space shows its secret
+/// (Matt, Oct 29 2026). One local key monitor on the main window; typing anywhere else is left alone, and while
+/// the search box has the cursor only ↑ ↓ Return are taken, so every other key still types.
+@MainActor
+enum KeyboardDriver {
+    private static var monitor: Any?
+
+    static func install(_ model: AppModel) {
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak model] e in
+            guard let model, handle(e, model) else { return e }
+            return nil
+        }
+    }
+
+    /// True when the key was used up.
+    static func handle(_ e: NSEvent, _ model: AppModel) -> Bool {
+        guard let w = e.window, w.identifier?.rawValue == "main", w.attachedSheet == nil, model.sheet == nil else { return false }
+        guard e.modifierFlags.intersection([.command, .option, .control]).isEmpty else { return false }
+        let typing = w.firstResponder is NSTextView
+        let inSearch = typing && ((w.firstResponder as? NSTextView)?.delegate is NSSearchField)
+        if typing && !inSearch { return false }
+        switch e.keyCode {
+        case 126: model.moveFocus(-1); return true   // ↑
+        case 125: model.moveFocus(1); return true    // ↓
+        case 36, 76:                                 // Return, Enter
+            guard model.focusId != nil else { return false }
+            model.activateFocus(); return true
+        case 49:                                     // Space
+            guard !inSearch, let b = model.focusedBookmark, b.hasSecret else { return false }
+            model.showSecret(b); return true
+        default: return false
         }
     }
 }
@@ -368,6 +422,7 @@ struct FolderDetail: View {
                 if f.isEmpty {
                     emptyState(f)
                 } else {
+                    ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 14) {
                             if !f.folders.isEmpty {
@@ -391,10 +446,12 @@ struct FolderDetail: View {
                                 Text("No bookmarks at this level — they are in the \(path.depth == 0 ? "directories" : "sub-directories") above.").font(DS.secondary).foregroundStyle(.secondary).padding(.top, 4)
                             }
                             EndDrop(path: path)
-                            Text("Click a name to open it in \(browserName). Drag a row onto a directory or a tab to move it; right-click for more.")
+                            Text("Click a name to open it in \(browserName). Drag a row onto a directory or a tab to move it; right-click for more. ↑ ↓ walk the rows, Return opens, Space shows a secret.")
                                 .font(DS.secondary).foregroundStyle(.tertiary).padding(.top, 8)
                         }
                         .padding(.horizontal, 28).padding(.bottom, 24)
+                    }
+                    .onChange(of: model.focusId) { _, id in if let id { withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(id) } } }
                     }
                 }
             }
@@ -476,9 +533,10 @@ struct SubfolderRow: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 9)
         .background(background, in: RoundedRectangle(cornerRadius: DS.radius))
-        .overlay(RoundedRectangle(cornerRadius: DS.radius).strokeBorder(targeted || model.highlightId == folder.id ? Theme.accent : DS.edge(scheme), lineWidth: targeted || model.highlightId == folder.id ? 2 : 1))
+        .overlay(RoundedRectangle(cornerRadius: DS.radius).strokeBorder(targeted || model.highlightId == folder.id || model.focusId == folder.id ? Theme.accent : DS.edge(scheme), lineWidth: targeted || model.highlightId == folder.id || model.focusId == folder.id ? 2 : 1))
         .contentShape(Rectangle())
         .onHover { over = $0 }
+        .id(folder.id)
         .onTapGesture { model.select(path) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -563,9 +621,10 @@ struct BookmarkRow: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(background)
         .overlay(alignment: .top) { if targeted { Rectangle().fill(Theme.accent).frame(height: 3) } }
-        .overlay { if model.highlightId == bookmark.id { RoundedRectangle(cornerRadius: DS.radiusSmall).strokeBorder(Theme.accent, lineWidth: 2) } }
+        .overlay { if model.highlightId == bookmark.id || model.focusId == bookmark.id { RoundedRectangle(cornerRadius: DS.radiusSmall).strokeBorder(Theme.accent, lineWidth: 2) } }
         .contentShape(Rectangle())
         .onHover { over = $0 }
+        .id(bookmark.id)
         .accessibilityElement(children: .contain)
         .draggable(DragItem.bookmark(bookmark.id).token) { DragPreview(title: bookmark.name, icon: "bookmark") }
         .dropDestination(for: String.self) { items, _ in

@@ -322,3 +322,95 @@ final class TreeStateTests: XCTestCase {
         XCTAssertEqual(m.selectedPath, hit.path.parent)
     }
 }
+
+/// The keyboard (Matt, Oct 29 2026): arrows walk the rows, Return opens, ⌘↑ goes up, ⌘1–9 switch tabs.
+@MainActor
+final class KeyboardTests: XCTestCase {
+    private var home: URL!
+    override func setUp() async throws {
+        home = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarkmanager-keys-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        setenv("BOOKMARKMANAGER_HOME", home.path, 1)
+    }
+    override func tearDown() async throws { unsetenv("BOOKMARKMANAGER_HOME"); try? FileManager.default.removeItem(at: home) }
+    private func model() -> AppModel { let m = AppModel(); m.settings.fetchIcons = false; m.icons.enabled = false; m.importFileForTest(Sample.library()); return m }
+
+    func testArrowsWalkSubdirectoriesThenBookmarksAndStopAtTheEnds() throws {
+        let m = model()
+        let work = try XCTUnwrap(m.library.tabs.first { $0.name == "Work" })
+        m.selectTab(work.id)
+        let rows = m.keyboardRows
+        XCTAssertEqual(rows, work.folders.map(\.id) + work.bookmarks.map(\.id))
+        XCTAssertNil(m.focusId)
+        m.moveFocus(1); XCTAssertEqual(m.focusId, rows.first, "↓ from nowhere starts at the top")
+        m.moveFocus(-1); XCTAssertEqual(m.focusId, rows.first, "and stops there")
+        for _ in rows { m.moveFocus(1) }
+        XCTAssertEqual(m.focusId, rows.last, "↓ stops at the bottom")
+        m.focusId = nil; m.moveFocus(-1); XCTAssertEqual(m.focusId, rows.last, "↑ from nowhere starts at the bottom")
+        // Return on a sub-directory opens it on the page; ⌘↑ comes back with it under the arrow keys
+        m.focusId = rows.first
+        m.activateFocus()
+        XCTAssertEqual(m.selectedPath, FolderPath([work.id, rows[0]]))
+        XCTAssertNil(m.focusId, "a new page starts with nothing focused")
+        m.goUp()
+        XCTAssertEqual(m.selectedPath, FolderPath(tab: work.id))
+        XCTAssertEqual(m.focusId, rows.first)
+    }
+
+    func testSearchRowsFollowTheGroupingByTabAndTypingClearsTheFocus() throws {
+        let m = model()
+        m.query = "admin"
+        let hits = m.hits
+        XCTAssertGreaterThan(hits.count, 1)
+        let grouped = m.library.tabs.flatMap { t in hits.filter { $0.tabId == t.id }.map(\.id) }
+        XCTAssertEqual(m.keyboardRows, grouped)
+        m.moveFocus(1); m.moveFocus(1)
+        XCTAssertEqual(m.focusId, grouped[1])
+        m.query = "admin p"
+        XCTAssertNil(m.focusId)
+        // Return on a directory hit leaves the search and opens it
+        let folderHit = try XCTUnwrap(m.library.search("admin pages").first { $0.isFolder })
+        m.query = "admin pages"; m.focusId = folderHit.id
+        m.activateFocus()
+        XCTAssertFalse(m.isSearching); XCTAssertEqual(m.selectedPath, folderHit.path)
+    }
+
+    func testTabShortcutsAndCopyAddress() throws {
+        let m = model()
+        let names = m.library.tabs.map(\.name)
+        m.selectTab(number: 2); XCTAssertEqual(m.currentTab?.name, names[1])
+        m.selectTab(number: 9); XCTAssertEqual(m.currentTab?.name, names[1], "no ninth tab: nothing happens")
+        m.selectNextTab(1); XCTAssertEqual(m.currentTab?.name, names[2])
+        m.selectNextTab(-1); XCTAssertEqual(m.currentTab?.name, names[1])
+        m.selectTab(number: names.count); m.selectNextTab(1); XCTAssertEqual(m.currentTab?.name, names[0], "wraps around")
+        m.selectNextTab(-1); XCTAssertEqual(m.currentTab?.name, names[names.count - 1], "and back")
+        let secretOnly = try XCTUnwrap(m.library.allBookmarks.first { $0.isSecretOnly })
+        let web = try XCTUnwrap(m.library.allBookmarks.first { !$0.isSecretOnly })
+        NSPasteboard.general.clearContents(); NSPasteboard.general.setString("before", forType: .string)
+        m.focusId = secretOnly.id; m.copyFocusedAddress()
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), "before", "a secret-only item has no address to copy")
+        m.focusId = web.id; m.copyFocusedAddress()
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), web.link?.absoluteString)
+    }
+}
+
+/// Secret windows that hide themselves, and Touch ID before a secret (Matt, Oct 29 2026).
+@MainActor
+final class SecretGuardTests: XCTestCase {
+    func testSettingsHaveSafeDefaultsAndReadOldFiles() throws {
+        let fresh = AppSettings()
+        XCTAssertEqual(fresh.secretHideMinutes, 5); XCTAssertFalse(fresh.touchIDForSecrets)
+        let old = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"appearance":"dark"}"#.utf8))
+        XCTAssertEqual(old.secretHideMinutes, 5); XCTAssertFalse(old.touchIDForSecrets)
+        let odd = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"secretHideMinutes":-3,"touchIDForSecrets":true}"#.utf8))
+        XCTAssertEqual(odd.secretHideMinutes, 0, "a negative number means never, not a crash"); XCTAssertTrue(odd.touchIDForSecrets)
+    }
+
+    func testOnePassedCheckCoversAMinute() {
+        SecretGate.forget()
+        XCTAssertFalse(SecretGate.recentlyPassed)
+        SecretGate.pretendPassed(ago: 10); XCTAssertTrue(SecretGate.recentlyPassed)
+        SecretGate.pretendPassed(ago: SecretGate.grace + 1); XCTAssertFalse(SecretGate.recentlyPassed)
+        SecretGate.forget()
+    }
+}

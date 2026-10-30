@@ -34,6 +34,19 @@ struct BookmarkManagerApp: App {
                 Button("Sort This Directory by Name") { model.sortByName(model.selectedPath) }.disabled(model.isSearching)
                 Divider()
                 Button("Rename Tab…") { if let t = model.currentTab { model.sheet = .renameTab(t) } }.disabled(model.isSearching)
+                Divider()
+                // the keyboard (Matt, Oct 29 2026); ↑ ↓ Return Space are handled in the window itself (KeyboardDriver)
+                Button("Copy Address") { model.copyFocusedAddress() }.keyboardShortcut("l").disabled(model.focusedBookmark.map(\.isSecretOnly) ?? true)
+                Button("Show Secret") { model.showFocusedSecret() }.disabled(!(model.focusedBookmark?.hasSecret ?? false))
+                Button("Enclosing Directory") { model.goUp() }.keyboardShortcut(.upArrow, modifiers: .command).disabled(model.isSearching || model.selectedPath.isTabRoot)
+            }
+            CommandMenu("Tabs") {
+                ForEach(Array(model.library.tabs.prefix(9).enumerated()), id: \.element.id) { i, tab in
+                    Button(tab.name) { model.selectTab(tab.id) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")))
+                }
+                Divider()
+                Button("Next Tab") { model.selectNextTab(1) }.keyboardShortcut(.tab, modifiers: .control).disabled(model.library.tabs.count < 2)
+                Button("Previous Tab") { model.selectNextTab(-1) }.keyboardShortcut(.tab, modifiers: [.control, .shift]).disabled(model.library.tabs.count < 2)
             }
         }
 

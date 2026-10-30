@@ -35,9 +35,23 @@ enum SecretWindows {
         return s?.visibleFrame.size ?? NSSize(width: 1440, height: 900)
     }
 
+    static func isOpen(_ id: UUID) -> Bool { windows[id] != nil }
+
+    /// The window hides itself after Settings' minutes without being used (0 = never); using it again restarts the clock.
+    static func arm(_ id: UUID) {
+        guard let holder = holders[id] else { return }
+        holder.timer?.invalidate(); holder.timer = nil
+        let minutes = holder.model?.settings.secretHideMinutes ?? 0
+        guard minutes > 0 else { return }
+        holder.timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(minutes) * 60, repeats: false) { _ in
+            MainActor.assumeIsolated { SecretWindows.close(id) }
+        }
+    }
+
     static func show(_ b: Bookmark, model: AppModel) {
-        if let w = windows[b.id] { holders[b.id]?.bookmark = b; w.makeKeyAndOrderFront(nil); return }
+        if let w = windows[b.id] { holders[b.id]?.bookmark = b; w.makeKeyAndOrderFront(nil); arm(b.id); return }
         let holder = SecretHolder(bookmark: b)
+        holder.model = model
         let view = SecretView(holder: holder, model: model).environmentObject(model).environmentObject(model.icons)
         let size = fittedSize(for: b.secret, screen: screenSize())
         let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -50,6 +64,7 @@ enum SecretWindows {
         holder.fitted = size
         windows[b.id] = w; holders[b.id] = holder
         w.makeKeyAndOrderFront(nil)
+        arm(b.id)
     }
 
     /// The bookmark changed: the open window shows the new text and title, and fits the new text again unless
@@ -71,7 +86,13 @@ enum SecretWindows {
 
     fileprivate static func forget(_ w: NSWindow) {
         guard let id = windows.first(where: { $0.value === w })?.key else { return }
+        holders[id]?.timer?.invalidate()
         windows.removeValue(forKey: id); holders.removeValue(forKey: id)
+    }
+
+    fileprivate static func used(_ w: NSWindow) {
+        guard let id = windows.first(where: { $0.value === w })?.key else { return }
+        arm(id)
     }
 
     private final class Closer: NSObject, NSWindowDelegate {
@@ -80,6 +101,11 @@ enum SecretWindows {
             guard let w = n.object as? NSWindow else { return }
             MainActor.assumeIsolated { SecretWindows.forget(w) }
         }
+        // brought forward or clicked into: the hide-after clock starts again
+        func windowDidBecomeKey(_ n: Notification) {
+            guard let w = n.object as? NSWindow else { return }
+            MainActor.assumeIsolated { SecretWindows.used(w) }
+        }
     }
 }
 
@@ -87,6 +113,9 @@ final class SecretHolder: ObservableObject {
     @Published var bookmark: Bookmark
     /// the size the window was given to fit its text (a window still this size follows the text when it changes)
     var fitted = NSSize.zero
+    /// hides the window after Settings' minutes
+    var timer: Timer?
+    weak var model: AppModel?
     init(bookmark: Bookmark) { self.bookmark = bookmark }
 }
 

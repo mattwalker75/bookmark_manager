@@ -42,7 +42,9 @@ final class AppModel: ObservableObject {
     @Published var selectedTabId: UUID
     /// the folder whose contents the window shows (inside the selected tab)
     @Published var selectedPath: FolderPath
-    @Published var query = ""
+    @Published var query = "" { didSet { if query != oldValue { focusId = nil } } }
+    /// the row the arrow keys are on: a sub-directory or bookmark of the open directory, or a search hit (Matt, Oct 29 2026)
+    @Published var focusId: UUID?
     @Published var sheet: MainSheet?
     @Published var notice: Notice?
     /// a row to flash after "Show in place"
@@ -114,13 +116,62 @@ final class AppModel: ObservableObject {
         guard library.tab(id) != nil else { return }
         selectedTabId = id
         selectedPath = FolderPath(tab: id)
+        focusId = nil
     }
 
     func select(_ path: FolderPath) {
         guard library.folder(at: path) != nil else { return }
         selectedTabId = path.tabId
         selectedPath = path
+        focusId = nil
         reveal(path)
+    }
+
+    // MARK: the keyboard (Matt, Oct 29 2026): arrows walk the rows, Return opens, Space shows the secret
+
+    /// The ids the arrow keys move through, top to bottom, exactly as the page shows them: the open directory's
+    /// sub-directories then its bookmarks — or, while searching, the hits grouped by tab.
+    var keyboardRows: [UUID] {
+        if isSearching { let all = hits; return library.tabs.flatMap { t in all.filter { $0.tabId == t.id }.map(\.id) } }
+        guard let f = currentFolder else { return [] }
+        return f.folders.map(\.id) + f.bookmarks.map(\.id)
+    }
+    /// ↓ is +1, ↑ is −1; from nowhere, ↓ starts at the top and ↑ at the bottom. Stops at the ends.
+    func moveFocus(_ delta: Int) {
+        let rows = keyboardRows
+        guard !rows.isEmpty else { focusId = nil; return }
+        guard let cur = focusId, let i = rows.firstIndex(of: cur) else { focusId = delta >= 0 ? rows.first : rows.last; return }
+        focusId = rows[min(max(i + delta, 0), rows.count - 1)]
+    }
+    /// the focused row's bookmark, if it is one
+    var focusedBookmark: Bookmark? { focusId.flatMap { library.bookmark($0) } }
+    /// Return: a bookmark opens (a secret-only one shows its secret), a directory is opened on the page.
+    func activateFocus() {
+        guard let id = focusId else { return }
+        if isSearching {
+            guard let hit = hits.first(where: { $0.id == id }) else { return }
+            if case .bookmark(let b) = hit.kind { open(b) } else { query = ""; select(hit.path) }
+            return
+        }
+        if let b = library.bookmark(id) { open(b) }
+        else if let p = library.path(toFolder: id), p.parent == selectedPath { select(p) }
+    }
+    /// Space: the focused bookmark's secret, when it has one.
+    func showFocusedSecret() { if let b = focusedBookmark, b.hasSecret { showSecret(b) } }
+    /// ⌘L: the focused bookmark's address (a secret-only one has none).
+    func copyFocusedAddress() { if let b = focusedBookmark, !b.isSecretOnly { copyAddress(b) } }
+    /// ⌘↑: the directory above, with the one just left under the arrow keys.
+    func goUp() {
+        guard !isSearching, let parent = selectedPath.parent else { return }
+        let from = selectedPath.folderId
+        select(parent)
+        focusId = from
+    }
+    func selectTab(number n: Int) { if n >= 1, n <= library.tabs.count { selectTab(library.tabs[n - 1].id) } }
+    func selectNextTab(_ step: Int) {
+        guard let i = library.tabs.firstIndex(where: { $0.id == selectedTabId }) else { return }
+        let n = library.tabs.count
+        selectTab(library.tabs[((i + step) % n + n) % n].id)
     }
 
     /// After a change, the selection still points at something that exists.
@@ -240,7 +291,16 @@ final class AppModel: ObservableObject {
         NSPasteboard.general.setString(b.link?.absoluteString ?? b.url, forType: .string)
     }
 
-    func showSecret(_ b: Bookmark) { SecretWindows.show(b, model: self) }
+    /// Shows the secret window — after Touch ID (or the Mac's password) when Settings asks for it; one check
+    /// covers the next minute, so opening three secrets in a row asks once.
+    func showSecret(_ b: Bookmark) {
+        guard settings.touchIDForSecrets, !SecretGate.recentlyPassed, !SecretWindows.isOpen(b.id) else { SecretWindows.show(b, model: self); return }
+        SecretGate.check(reason: "show the secret for “\(b.name)”") { [weak self] passed, problem in
+            guard let self else { return }
+            if passed { SecretWindows.show(b, model: self) }
+            else if let problem { self.notice = Notice(title: "The secret stays hidden", message: problem) }
+        }
+    }
 
     // MARK: settings that live in the library
 
@@ -301,6 +361,10 @@ struct AppSettings: Codable, Equatable {
     var fetchIcons = true
     /// the directories whose sub-directories are shown in the folder tree (everything else is collapsed; remembered)
     var expanded: Set<UUID> = []
+    /// a secret window hides itself after this many minutes without being used; 0 = never (Matt, Oct 29 2026)
+    var secretHideMinutes = 5
+    /// Touch ID (or the Mac's password) before a secret is shown
+    var touchIDForSecrets = false
 
     var activeTheme: CustomTheme? { activeThemeId.flatMap { id in themes.first { $0.id == id } } }
     var effectiveAppearance: Appearance { activeTheme?.look ?? appearance }
@@ -316,6 +380,8 @@ struct AppSettings: Codable, Equatable {
         browser = try c.decodeIfPresent(String.self, forKey: .browser)
         fetchIcons = try c.decodeIfPresent(Bool.self, forKey: .fetchIcons) ?? true
         expanded = try c.decodeIfPresent(Set<UUID>.self, forKey: .expanded) ?? []
+        secretHideMinutes = max(0, try c.decodeIfPresent(Int.self, forKey: .secretHideMinutes) ?? 5)
+        touchIDForSecrets = try c.decodeIfPresent(Bool.self, forKey: .touchIDForSecrets) ?? false
     }
 
     static var url: URL { Home.folder().appendingPathComponent("settings.json") }

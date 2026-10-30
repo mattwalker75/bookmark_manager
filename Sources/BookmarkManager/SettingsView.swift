@@ -54,6 +54,20 @@ struct GeneralPane: View {
                 Text(depthProblem ?? "2 means a directory and one sub-directory in it (the usual). It can't be lowered while a deeper directory exists; move or delete those first.")
                     .font(DS.secondary).foregroundStyle(depthProblem == nil ? Color.secondary : Theme.problem)
             }
+            Section("Secrets") {
+                Picker("Hide a secret window after", selection: $model.settings.secretHideMinutes) {
+                    ForEach([1, 2, 5, 10, 30], id: \.self) { m in Text("\(m) minute\(m == 1 ? "" : "s")").tag(m) }
+                    Text("Never").tag(0)
+                }
+                Text("An open secret window closes by itself after this long without being used. Clicking into it starts the clock again.")
+                    .font(DS.secondary).foregroundStyle(.secondary)
+                Toggle("Ask for Touch ID before showing a secret", isOn: $model.settings.touchIDForSecrets)
+                    .onChange(of: model.settings.touchIDForSecrets) { _, on in if !on { SecretGate.forget() } }
+                Text(SecretGate.available
+                     ? "Touch ID, or your Mac's password where there is no Touch ID. One check covers the next minute, so several secrets in a row ask once."
+                     : "This Mac has no Touch ID and no login password to check against, so the option can't do anything here.")
+                    .font(DS.secondary).foregroundStyle(.secondary)
+            }
             Section {
                 Toggle("Fetch site icons", isOn: $model.settings.fetchIcons)
                 Text("Each site's icon is fetched once from its address and kept on this Mac; a site without one shows the link glyph. Turned off, nothing is fetched (icons already here still show).")

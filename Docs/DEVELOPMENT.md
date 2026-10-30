@@ -49,7 +49,8 @@ the .app running.
 `Home.folder()` = `~/Library/Application Support/Bookmark Manager/`, or `$BOOKMARKMANAGER_HOME`.
 `library.json` (`{"app":"Bookmark Manager","library":{…}}`, secrets blank) · `secrets.enc` (AES-GCM,
 `{bookmarkId: text}`) · `secret.key` (32 random bytes, 0600) · `settings.json` (appearance, accent, themes,
-activeThemeId, browser bundle id, fetchIcons, `expanded` = the directory ids whose branch is open in the tree) · `icons/<host>.png` (`<host>_<port>.png` for a non-standard port).
+activeThemeId, browser bundle id, fetchIcons, `expanded` = the directory ids whose branch is open in the tree,
+`secretHideMinutes` (0 = never), `touchIDForSecrets`) · `icons/<host>.png` (`<host>_<port>.png` for a non-standard port).
 
 The export file is `{"app":"Bookmark Manager","version":1,"exportedAt":…,"secretsIncluded":bool,"library":{…}}`
 with the library exactly as in library.json (plus the secrets when included).
@@ -60,7 +61,9 @@ with the library exactly as in library.json (plus the secrets when included).
 - `BOOKMARKMANAGER_AUTOSHEET=newBookmark | editBookmark | newFolder | editFolder | newTab | move | secret |
   search:<text> | settings[:general|colors|appearance|transfer]` — open that sheet / window a second after launch
   (`newSecret` opens the bookmark editor with Secret only picked; `secret:<name prefix>` opens that bookmark's secret
-  window, e.g. `secret:Backup` for the long sample secret).
+  window, e.g. `secret:Backup` for the long sample secret; `keys:125,125,36` posts those key codes to the main
+  window like real presses — 125 ↓, 126 ↑, 36 Return, 49 Space). Several steps run a second apart when separated
+  by `;`: `search:admin;keys:125,125`.
 
 Screenshots: run `.build/debug/BookmarkManager` with those variables, then `screencapture -x -l <window id>`
 (after `caffeinate -u -t 1`; the window ids from `CGWindowListCopyWindowInfo`, owner `BookmarkManager`).

@@ -12,6 +12,12 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   keep **Secret**). The editor starts with a **Web page / Secret only** choice: Secret only hides the Address row
   and the secret switch; right-click a directory → **New secret here…**. Validate no longer stops on a missing
   address when the item has a secret.
+- 2026-10-29: **The keyboard** — ↑ ↓ walk the rows of the open directory (or the search results, straight from
+  the search box), Return opens the row under the keys, Space shows its secret, ⌘L copies its address, ⌘↑ goes up
+  a directory; a Tabs menu with ⌘1 … ⌘9, ⌃Tab and ⌃⇧Tab.
+- 2026-10-29: **Secret windows look after themselves** — a secret window hides itself after 5 minutes without
+  being used (Settings → General: 1 to 30 minutes, or Never; clicking into it restarts the clock), and Settings
+  can ask for Touch ID (or the Mac's password) before a secret is shown — one check covers the next minute.
 - 2026-10-29: **Collapsible directories** (Matt's pick: option A, chevrons) — a directory with sub-directories
   gets a chevron in the folder tree; click it (or right-click → Show / Hide sub-directories) to open or close the
   branch. Everything starts closed; what you open is remembered in settings.json across launches. A closed

@@ -49,6 +49,12 @@ it is not a developer: every message is a plain sentence.
    row's directory; a bookmark dropped on a row lands before it; tabs reorder by dragging along the tab bar.
 5. **Opening:** a single click on the name opens it in the browser chosen in Settings → General (bundle id in
    settings.json; nil = the Mac's default; a vanished browser falls back with a notice). Right-click / the pencil edits.
+5a. **The keyboard** (Matt, Oct 29 2026): `AppModel.focusId` is the row under ↑ ↓ (`keyboardRows` = the page's
+    sub-directories then bookmarks, or the hits grouped by tab exactly as shown); Return `activateFocus`, Space the
+    secret, ⌘L `copyFocusedAddress`, ⌘↑ `goUp` (the directory just left stays focused); Tabs menu ⌘1–9, ⌃Tab.
+    `KeyboardDriver` is ONE local key monitor on the main window: nothing while a sheet is up or another text view
+    has the cursor; in the search box only ↑ ↓ Return are taken. Focus clears on select / tab / typing. Rows carry
+    `.id()` so the page scrolls to the focused row.
 6. **Secrets: encrypted on disk, NOT the Keychain** (Matt, Oct 28 2026 — an ad-hoc-signed app would be asked again
    after every rebuild): `secrets.enc` + `secret.key` (0600), keyed by bookmark id, never in library.json. Multi-line.
    The secret window is select-to-copy only (no Copy button, Matt). `hasSecret` stays true when the text is blank
@@ -56,6 +62,11 @@ it is not a developer: every message is a plain sentence.
    sizes itself to its text** (Matt, Oct 29 2026): `SecretWindows.fittedSize` measures the lines in the window's own
    monospaced font plus the chrome, clamped to `floor` (420×180) and 60% × 70% of the screen; a changed secret
    refits only while the window is still the size it was given (a hand-resized one is left alone).
+   **Hide-after and Touch ID** (Matt, Oct 29 2026): `SecretWindows.arm` closes a window after
+   `settings.secretHideMinutes` (0 = never) of not being key, re-armed on `windowDidBecomeKey`; `AppModel.showSecret`
+   goes through `SecretGate` (LocalAuthentication `.deviceOwnerAuthentication`) when `touchIDForSecrets` is on —
+   one pass covers 60 s, a cancel says nothing, a window already open is just brought forward. NO password
+   generator (Matt: secrets are not only passwords).
 6a. **Secret-only items** (Matt, Oct 29 2026; mockup canvas UG7WKF8nLnByzTDEKbpewk — row A, editor B): a bookmark
     may have NO address when it has a secret (`Bookmark.isSecretOnly` = blank url; `cleaned` refuses blank url +
     no secret). It stays in the same list as every other bookmark (manual order, colors, drag, search by name/tags).

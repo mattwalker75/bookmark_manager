@@ -64,6 +64,10 @@ hidden until you ask for it.
   the part you need — a word, a line — and copy it (⌘C, or double-click a word and right-click → Copy). There is
   no Copy button on purpose: a secret usually holds several things.
 - **Hide** closes the window. Closing it any other way does the same. **Edit bookmark…** opens the editor.
+- A secret window also **hides itself** after a while without being used — 5 minutes unless you change it in
+  Settings → General (1 to 30 minutes, or Never). Clicking into the window starts the clock again.
+- Settings → General can **ask for Touch ID** (or your Mac's password) before a secret is shown. One check covers
+  the next minute, so opening several secrets in a row asks once. Turn it off there whenever you like.
 - Secrets never go into the bookmarks file, and go into an export only when you tick the box (see Export).
 
 ## Arranging
@@ -81,6 +85,16 @@ hidden until you ask for it.
 - Results are grouped by tab. Each shows where it lives (*Work › Self-hosted apps › Admin pages*), what matched,
   and the Secret button. Click a name to open it; **Show in place** switches to its tab, opens its directory and
   marks the row for a moment. **Clear** (or Esc in the box) goes back.
+
+## The keyboard
+- **↑ ↓** walk the rows of the open directory (sub-directories first, then bookmarks); the row under the keys
+  gets the accent outline. **Return** opens it: a bookmark in your browser, a secret-only item's secret, a
+  sub-directory on the page. **Space** shows the row's secret. **⌘L** copies its address. **⌘↑** goes up to the
+  enclosing directory, with the one you left under the keys.
+- While the cursor is in the search box, ↑ ↓ walk the results and Return opens the one under the keys; every
+  other key keeps typing.
+- **⌘1 … ⌘9** switch to that tab (the Tabs menu lists them); **⌃Tab** and **⌃⇧Tab** go to the next and previous tab.
+- As before: ⌘N new bookmark, ⇧⌘N new directory, ⌘T new tab, ⌘F search, ⌘E edit the open directory.
 
 ## Color codes
 - Settings → **Color codes**: each color has a name — *Important*, *Work*, *Personal*, *Reference* to start.

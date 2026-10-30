@@ -26,6 +26,7 @@ struct SearchResults: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 40)
             } else {
+                ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         ForEach(model.library.tabs) { tab in
@@ -40,10 +41,12 @@ struct SearchResults: View {
                                 }
                             }
                         }
-                        Text("Results update as you type. “Show in place” switches to the tab, opens the directory and marks the row.")
+                        Text("Results update as you type. “Show in place” switches to the tab, opens the directory and marks the row. ↑ ↓ walk the results from the search box; Return opens.")
                             .font(DS.secondary).foregroundStyle(.tertiary).padding(.top, 4)
                     }
                     .padding(.horizontal, 28).padding(.bottom, 24)
+                }
+                .onChange(of: model.focusId) { _, id in if let id { withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(id) } } }
                 }
             }
         }
@@ -100,8 +103,10 @@ struct HitRow: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(background)
+        .overlay { if model.focusId == hit.id { RoundedRectangle(cornerRadius: DS.radiusSmall).strokeBorder(Theme.accent, lineWidth: 2) } }
         .contentShape(Rectangle())
         .onHover { over = $0 }
+        .id(hit.id)
         .contextMenu {
             if case .bookmark(let b) = hit.kind {
                 if b.isSecretOnly { Button("Show secret") { model.showSecret(b) } }
