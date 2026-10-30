@@ -54,7 +54,7 @@ activeThemeId, browser bundle id, fetchIcons, `expanded` = the directory ids who
 settings `backupFolder`): `Bookmark Manager <date>.bmbackup` = JSON `BackupFile` {app, kind:"backup", version 1, createdAt,
 reason, kept, note, counts, library (secrets blank), secrets (AES-GCM of {id: text} with secret.key, base64),
 passphrase {wrapped, salt, rounds} = secret.key sealed with PBKDF2-HMAC-SHA256(passphrase)}. Settings also keep
-`backupsEnabled`, `backupWhen`, `backupKeep`, `backupPassphrase` (the wrap, safe to store), `lastBackupDigest`
+`backupsEnabled`, `backupWhen`, `backupKeep`, `backupPassphrase` (the wrap, safe to store), `backupSecretsPlain` (secrets in the clear in each backup; the file then has `secretsInClear: true` and no `secrets`), `lastBackupDigest`
 (SHA-256 of the library with secrets: an unchanged library is not backed up again), `lastBackupAt`. · `icons/<host>.png` (`<host>_<port>.png` for a non-standard port).
 
 The export file is `{"app":"Bookmark Manager","version":1,"exportedAt":…,"secretsIncluded":bool,"library":{…}}`

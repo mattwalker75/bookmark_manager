@@ -112,7 +112,10 @@ it is not a developer: every message is a plain sentence.
     "Enable backups" is the label (Matt). Verify = `Backup.check` (Validate's checks + can the secrets open);
     Restore writes a KEPT "before restore" backup first, then goes through `importFile(.replace)` so the secrets are
     re-sealed with the current key. Fresh-Mac path: Restore from a file… → asks for the key file or the passphrase.
-    "Save a copy of the secret key…" exists for that day. NO password generator anywhere.
+    "Save a copy of the secret key…" exists for that day. NO password generator anywhere. **Plain-text backups**
+    (Matt, Oct 30 2026): `backupSecretsPlain` / `Backup.make(secretsInClear:)` writes the secrets in the clear inside
+    `library` and sets `secretsInClear` on the file (`Backup.library` then returns it as is); default OFF, red text
+    while on, Verify says "in plain text"; changing the choice resets `lastBackupDigest` so the next backup is written.
 12. **Text fields are `PlainTextField` / `Field`**, the secret is a `TextBox` (data_syncer rule 14b). Base text 14.
 12a. **One copy at a time, and the disk is the truth** (review, Oct 28 2026): `AppDelegate` quits a second copy of the
     .app and brings the first forward; `LibraryStore` remembers library.json's size+date and refuses a save when

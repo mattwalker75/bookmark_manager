@@ -15,7 +15,7 @@ final class BackupTests: XCTestCase {
         XCTAssertEqual(f.version, 1); XCTAssertEqual(f.reason, .manual); XCTAssertEqual(f.note, "first"); XCTAssertFalse(f.kept)
         XCTAssertEqual(f.counts.bookmarks, lib.allBookmarks.count); XCTAssertEqual(f.counts.secrets, 3)
         XCTAssertTrue(f.library.allBookmarks.allSatisfy { $0.secret.isEmpty }, "no secret in the clear")
-        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("correct-horse"), "nor anywhere in the file")
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("hunter2"), "nor anywhere in the file")
         let secrets = try Backup.secrets(in: f, key: key)
         XCTAssertEqual(secrets.count, 3)
         XCTAssertEqual(Backup.library(f, secrets: secrets), lib, "the library comes back whole")
@@ -100,5 +100,23 @@ final class BackupTests: XCTestCase {
         changed.tabs[0].bookmarks[0].secret += "!"
         XCTAssertNotEqual(Backup.digest(lib), Backup.digest(changed))
         XCTAssertEqual(Backup.digest(lib), Backup.digest(Sample.library()))
+    }
+}
+
+/// The plain-text choice (Matt, Oct 30 2026): the secrets written in the clear, by request only.
+final class PlainBackupTests: XCTestCase {
+    func testAPlainBackupHoldsTheSecretsInTheClearAndNeedsNoKey() throws {
+        let lib = Sample.library()
+        let data = try Backup.make(lib, key: nil, passphrase: nil, reason: .manual, secretsInClear: true)
+        XCTAssertTrue(String(decoding: data, as: UTF8.self).contains("hunter2"), "that is the point of it")
+        let f = try Backup.read(data)
+        XCTAssertTrue(f.secretsInClear); XCTAssertNil(f.secrets); XCTAssertEqual(f.counts.secrets, 3)
+        XCTAssertEqual(Backup.library(f, secrets: [:]), lib, "the library comes back whole with no key at all")
+        let c = try Backup.check(data, at: URL(fileURLWithPath: "/tmp/p.bmbackup"), key: nil, openedWith: "").get()
+        XCTAssertTrue(c.canRestore); XCTAssertTrue(c.secretsReadable); XCTAssertTrue(c.secretsInClear); XCTAssertFalse(c.hasSecrets)
+        XCTAssertTrue(c.openedWith.contains("plain text"))
+        // the default stays sealed, and an old file without the flag reads as sealed
+        let sealed = try Backup.read(try Backup.make(lib, key: SymmetricKey(size: .bits256), passphrase: nil, reason: .manual))
+        XCTAssertFalse(sealed.secretsInClear)
     }
 }

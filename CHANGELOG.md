@@ -12,6 +12,9 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
   keep **Secret**). The editor starts with a **Web page / Secret only** choice: Secret only hides the Address row
   and the secret switch; right-click a directory → **New secret here…**. Validate no longer stops on a missing
   address when the item has a secret.
+- 2026-10-30: **Plain-text backups, by choice** — Settings → Backups → The secrets inside → Written as: sealed with
+  this Mac's key (the default) or plain text, for the case where a backup must not hold anything encrypted. The
+  pane warns in red while it is on; Verify says so; such a backup restores anywhere with no key or passphrase.
 - 2026-10-29: **Backups** (Matt's pick, with his changes: "Enable backups", Verify, the key) — Settings → Backups:
   dated backup files of everything, secrets sealed with this Mac's key, written daily and on quit (or after
   changes, or by hand) into a folder you choose, only when something changed; keep the latest N, mark any as

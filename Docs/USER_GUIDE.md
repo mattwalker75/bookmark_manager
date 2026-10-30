@@ -155,6 +155,9 @@ hidden until you ask for it.
 - **The secrets inside** are sealed with this Mac's secret key, the same as on disk. So: **Save a copy of the
   secret key…** once, somewhere safe (a password manager, a USB stick). Optionally **set a passphrase**; from then
   on each backup also opens with the words alone.
+- **Written as** can instead be **Plain text** — then every secret is written in the clear in each backup from
+  then on, readable by anyone who has the file (or a copy Time Machine or iCloud makes of it). Off unless you
+  choose it; the pane says so in red while it is on. Such a backup restores on any Mac with no key or passphrase.
 - **Starting over on a new Mac:** install Bookmark Manager, open Settings → Backups → **Restore from a file…**,
   pick the backup. The app finds its own new key doesn't open the secrets and asks for either the key file you
   saved or the passphrase. Verify, then Restore. The secrets are re-sealed with the new Mac's key from there on.

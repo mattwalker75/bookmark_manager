@@ -34,12 +34,21 @@ struct BackupsPane: View {
             }
             .disabled(false)
             Section("The secrets inside") {
+                Picker("Written as", selection: Binding(get: { model.settings.backupSecretsPlain }, set: { model.setBackupSecretsPlain($0) })) {
+                    Text("Sealed with this Mac's secret key").tag(false)
+                    Text("Plain text, readable by anyone with the file").tag(true)
+                }
+                if model.settings.backupSecretsPlain {
+                    Text("Every secret is written in the clear in each backup from now on. Anyone who can open the file — or any copy Time Machine, iCloud or a sync tool makes of it — can read them. Choose this only when you mean it, for instance for a backup you will lock up some other way.")
+                        .font(DS.secondary).foregroundStyle(Theme.problem)
+                } else {
+                    Text("The secrets in every backup are sealed with this Mac's secret key (secret.key), the same as on disk — so a backup is safe to copy anywhere, and opens on a Mac that has the key file. Save a copy of the key somewhere safe once (a password manager, a USB stick): on a new Mac, Restore asks for it.")
+                        .font(DS.secondary).foregroundStyle(.secondary)
+                }
                 HStack(spacing: 8) {
                     Button("Save a copy of the secret key…") { saveKey() }
                     Button("Show the key in Finder") { NSWorkspace.shared.activateFileViewerSelecting([model.store.secrets.keyURL]) }
                 }
-                Text("The secrets in every backup are sealed with this Mac's secret key (secret.key), the same as on disk — so a backup is safe to copy anywhere, and opens on a Mac that has the key file. Save a copy of the key somewhere safe once (a password manager, a USB stick): on a new Mac, Restore asks for it.")
-                    .font(DS.secondary).foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     Text(model.settings.backupPassphrase == nil ? "No passphrase set." : "A passphrase is set: backups also open with it.")
                     Spacer()
@@ -164,7 +173,8 @@ struct BackupCheckSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Made \(c.file.createdAt.formatted(date: .abbreviated, time: .shortened)), \(c.file.reason.label)" + (c.file.kept ? " · kept" : "") + (c.file.note.isEmpty ? "" : " — “\(c.file.note)”"))
                 Text(c.file.counts.text + (c.file.library.colors.isEmpty ? "" : " · \(c.file.library.colors.count) color codes") + " · \(c.file.library.maxDepth) directory levels").font(DS.secondary).foregroundStyle(.secondary)
-                if !c.hasSecrets { Text("No secrets inside.").font(DS.secondary).foregroundStyle(.secondary) }
+                if c.secretsInClear { Text("The \(c.file.counts.secrets) secrets are in plain text in this file — anyone who has it can read them.").font(DS.secondary).foregroundStyle(Theme.attention) }
+                else if !c.hasSecrets { Text("No secrets inside.").font(DS.secondary).foregroundStyle(.secondary) }
                 else if c.secretsReadable { Text("All \(c.file.counts.secrets) secrets open with \(c.openedWith).").font(DS.secondary).foregroundStyle(Theme.good) }
                 else { Text("The \(c.file.counts.secrets) secrets inside don't open with this Mac's key.").font(DS.secondary).foregroundStyle(Theme.attention) }
                 ForEach(Array(c.report.problems.enumerated()), id: \.offset) { _, p in

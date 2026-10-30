@@ -48,6 +48,31 @@ final class BackupModelTests: XCTestCase {
         XCTAssertEqual(m.backups.first?.reason, .quit)
     }
 
+    func testPlainTextBackupsRestoreAnywhereAndTheChoiceIsRemembered() throws {
+        let old = model()
+        old.importFileForTest(Sample.library())
+        old.setBackupSecretsPlain(true)
+        XCTAssertNotNil(old.backUp(reason: .manual))
+        let url = try XCTUnwrap(old.backups.first).url
+        XCTAssertTrue(String(decoding: try Data(contentsOf: url), as: UTF8.self).contains("correct-horse"))
+        XCTAssertTrue(AppSettings.load().backupSecretsPlain, "the choice is kept in settings.json")
+        // switching back writes a sealed one next time even though nothing else changed
+        old.setBackupSecretsPlain(false)
+        XCTAssertNotNil(old.backUp(reason: .daily))
+        XCTAssertFalse(String(decoding: try Data(contentsOf: try XCTUnwrap(old.backups.first).url), as: UTF8.self).contains("correct-horse"))
+        // a fresh Mac restores the plain one with no key and no passphrase
+        let fresh = FileManager.default.temporaryDirectory.appendingPathComponent("bookmarkmanager-fresh-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: fresh, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: fresh) }
+        setenv("BOOKMARKMANAGER_HOME", fresh.path, 1)
+        let m = model()
+        let c = try m.checkBackup(at: url).get()
+        XCTAssertTrue(c.canRestore); XCTAssertTrue(c.secretsInClear)
+        XCTAssertTrue(m.restoreBackup(c).hasPrefix("Restored"))
+        XCTAssertEqual(m.library.allBookmarks.first { $0.name == "Postgres admin" }?.secret.isEmpty, false)
+        XCTAssertEqual(model().library.allBookmarks.first { $0.name == "Postgres admin" }?.secret, Sample.library().allBookmarks.first { $0.name == "Postgres admin" }?.secret, "sealed with the fresh Mac's own key from here on")
+    }
+
     func testRestoreOnAFreshMacWithTheKeyFileOrThePassphrase() throws {
         // the old Mac: a library with secrets, a passphrase, one backup
         let old = model()

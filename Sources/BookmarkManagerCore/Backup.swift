@@ -84,8 +84,10 @@ public struct BackupFile: Codable, Equatable, Sendable {
     public var secrets: Data?
     /// the key sealed with a passphrase, when one was set
     public var passphrase: PassphraseWrap?
+    /// the secrets are written in the clear inside `library` (Matt, Oct 30 2026: a choice in Settings, off by default)
+    public var secretsInClear = false
 
-    enum CodingKeys: String, CodingKey { case app, kind, version, createdAt, reason, kept, note, counts, library, secrets, passphrase }
+    enum CodingKeys: String, CodingKey { case app, kind, version, createdAt, reason, kept, note, counts, library, secrets, passphrase, secretsInClear }
     public init(createdAt: Date, reason: BackupReason, counts: BackupCounts, library: Library) {
         self.createdAt = createdAt; self.reason = reason; self.counts = counts; self.library = library
     }
@@ -103,6 +105,7 @@ public struct BackupFile: Codable, Equatable, Sendable {
         counts = (try? c.decodeIfPresent(BackupCounts.self, forKey: .counts)) ?? BackupCounts(library)
         secrets = try c.decodeIfPresent(Data.self, forKey: .secrets)
         passphrase = try? c.decodeIfPresent(PassphraseWrap.self, forKey: .passphrase)
+        secretsInClear = try c.decodeIfPresent(Bool.self, forKey: .secretsInClear) ?? false
     }
 }
 
@@ -118,7 +121,9 @@ public struct BackupCheck: Equatable, Sendable {
     public var openedWith: String
     /// the secrets, once opened (never written anywhere by Verify)
     public var secrets: [String: String]
+    /// sealed secrets are inside (a plain-text backup has none to open)
     public var hasSecrets: Bool { file.secrets != nil }
+    public var secretsInClear: Bool { file.secretsInClear && file.counts.secrets > 0 }
     public var canRestore: Bool { report.canImport && (secretsReadable || !hasSecrets) }
     public var acceptsPassphrase: Bool { file.passphrase != nil }
 }
@@ -128,7 +133,14 @@ public enum Backup {
     public static let fileExtension = "bmbackup"
 
     /// The file's bytes: the library with its secrets sealed by `key`, and the key sealed by the passphrase when there is one.
-    public static func make(_ lib: Library, key: SymmetricKey?, passphrase: PassphraseWrap?, reason: BackupReason, now: Date = Date(), kept: Bool = false, note: String = "") throws -> Data {
+    /// `secretsInClear` writes the secrets as plain text inside the library instead of sealing them — readable by
+    /// anyone who has the file.
+    public static func make(_ lib: Library, key: SymmetricKey?, passphrase: PassphraseWrap?, reason: BackupReason, now: Date = Date(), kept: Bool = false, note: String = "", secretsInClear: Bool = false) throws -> Data {
+        if secretsInClear {
+            var f = BackupFile(createdAt: now, reason: reason, counts: BackupCounts(lib), library: lib)
+            f.kept = kept; f.note = note; f.secretsInClear = true
+            return try JSON.encoder.encode(f)
+        }
         var plain = lib
         var values: [String: String] = [:]
         for t in plain.tabs.indices { LibraryStore.strip(&plain.tabs[t], into: &values) }
@@ -163,6 +175,7 @@ public enum Backup {
 
     /// The library with its secrets put back.
     public static func library(_ f: BackupFile, secrets: [String: String]) -> Library {
+        if f.secretsInClear { return f.library }
         var lib = f.library
         for t in lib.tabs.indices { LibraryStore.fill(&lib.tabs[t], secrets) }
         return lib
@@ -177,7 +190,8 @@ public enum Backup {
         if let key, f.secrets != nil, let s = try? Backup.secrets(in: f, key: key) { secrets = s; readable = true }
         let filled = library(f, secrets: secrets)
         let report = Transfer.validate(ExportFile(secretsIncluded: readable, library: filled))
-        return .success(BackupCheck(file: f, url: url, report: report, secretsReadable: readable, openedWith: readable ? openedWith : "", secrets: secrets))
+        let how = f.secretsInClear ? "nothing: they are in plain text in this file" : (readable ? openedWith : "")
+        return .success(BackupCheck(file: f, url: url, report: report, secretsReadable: readable, openedWith: how, secrets: secrets))
     }
 
     /// "Bookmark Manager 2026-10-29 14-02-33.bmbackup"

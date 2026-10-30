@@ -302,7 +302,7 @@ final class AppModel: ObservableObject {
         if !force, digest == settings.lastBackupDigest { return nil }
         do {
             let key = try store.secrets.currentKey() ?? (library.allBookmarks.contains(where: \.hasSecret) ? try store.secrets.ensureKey() : nil)
-            let data = try Backup.make(library, key: key, passphrase: settings.backupPassphrase, reason: reason, kept: kept, note: note)
+            let data = try Backup.make(library, key: key, passphrase: settings.backupPassphrase, reason: reason, kept: kept, note: note, secretsInClear: settings.backupSecretsPlain)
             let url = try backupStore.write(data, at: Date())
             settings.lastBackupDigest = digest; settings.lastBackupAt = Date()
             backupStore.prune(keep: settings.backupKeep)
@@ -385,6 +385,7 @@ final class AppModel: ObservableObject {
         settings.lastBackupDigest = nil   // the next backup carries it
     }
     func clearBackupPassphrase() { settings.backupPassphrase = nil; settings.lastBackupDigest = nil }
+    func setBackupSecretsPlain(_ plain: Bool) { guard settings.backupSecretsPlain != plain else { return }; settings.backupSecretsPlain = plain; settings.lastBackupDigest = nil }
 
     /// Runs a change on the library; a refusal (or a failed save) becomes a notice and nothing changes. True when it went through.
     @discardableResult
@@ -565,6 +566,8 @@ struct AppSettings: Codable, Equatable {
     var backupKeep = 14
     /// this Mac's key sealed with the passphrase, when one was set (goes into every backup)
     var backupPassphrase: PassphraseWrap?
+    /// the secrets go into backups as plain text (Matt, Oct 30 2026); off = sealed with this Mac's key
+    var backupSecretsPlain = false
     var lastBackupDigest: String?
     var lastBackupAt: Date?
 
@@ -590,6 +593,7 @@ struct AppSettings: Codable, Equatable {
         backupWhen = (try? c.decodeIfPresent(BackupWhen.self, forKey: .backupWhen)) ?? .dailyAndQuit
         backupKeep = max(1, try c.decodeIfPresent(Int.self, forKey: .backupKeep) ?? 14)
         backupPassphrase = try? c.decodeIfPresent(PassphraseWrap.self, forKey: .backupPassphrase)
+        backupSecretsPlain = try c.decodeIfPresent(Bool.self, forKey: .backupSecretsPlain) ?? false
         lastBackupDigest = try c.decodeIfPresent(String.self, forKey: .lastBackupDigest)
         lastBackupAt = try? c.decodeIfPresent(Date.self, forKey: .lastBackupAt)
     }
