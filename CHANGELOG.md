@@ -2,6 +2,17 @@
 
 All notable changes to Bookmark Manager (Keep a Changelog style; dates are when the change was made).
 
+## [1.2.0] — 2026-11-08
+
+Matt, Nov 8 2026: three more things for the daily use — notes on directories, a way to bring a browser's
+bookmarks in, and bigger or smaller text in the secret and notes windows.
+
+### Added
+- 2026-11-08: **Text size in secret and notes windows** (Matt) — ⌘+ makes the text bigger, ⌘− smaller, ⌘0 puts
+  it back, for that one window while it is open (the window grows or shrinks to fit, unless you resized it by
+  hand). Settings → General has the size each kind of window opens with (*Text size in a secret window*, *Text
+  size in a notes window*; 9 to 36 points, 14 to begin with). The View menu has the same three items.
+
 ## [1.0.0] — 2026-11-08
 
 Matt, Nov 8 2026: in daily use with zero issues, so this is 1.0 — with the three tweaks below.

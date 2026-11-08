@@ -12,13 +12,17 @@ enum SecretWindows {
 
     /// the smallest the window is ever made (the tip line and the buttons fit)
     static let floor = NSSize(width: 420, height: 180)
-    /// the font the secret is shown in (the sizing below measures with the same one)
-    static let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize + 1, weight: .regular)
+    /// the font the secret is shown in, at `size` points (Settings' secret text size; ⌘+ ⌘− in the window — Matt,
+    /// Nov 8 2026); the sizing below measures with the same one
+    nonisolated static func font(_ size: Int) -> NSFont { NSFont.monospacedSystemFont(ofSize: CGFloat(size), weight: .regular) }
+    /// the model the windows belong to (for the View menu's text-size items)
+    static weak var model: AppModel?
 
     /// The window size that shows the whole secret without scrolling: the text measured in its font plus the
     /// chrome around it, never smaller than `floor`, never wider than 60% or taller than 70% of `screen` (Matt,
     /// Oct 29 2026: grow to fit, up to a cap). A secret longer than that scrolls inside.
-    static func fittedSize(for text: String, screen: NSSize) -> NSSize {
+    static func fittedSize(for text: String, screen: NSSize, size: Int = AppSettings.defaultTextSize) -> NSSize {
+        let font = SecretWindows.font(size)
         let shown = text.isEmpty ? SecretView.emptyText : text
         let lines = shown.components(separatedBy: "\n")
         let lineHeight = ceil(font.ascender - font.descender + font.leading)
@@ -74,10 +78,11 @@ enum SecretWindows {
 
     static func show(_ b: Bookmark, model: AppModel) {
         if let w = windows[b.id] { holders[b.id]?.bookmark = b; w.makeKeyAndOrderFront(nil); arm(b.id); return }
-        let holder = SecretHolder(bookmark: b)
+        let holder = SecretHolder(bookmark: b, textSize: model.settings.secretTextSize)
         holder.model = model
+        SecretWindows.model = model
         let view = SecretView(holder: holder, model: model).environmentObject(model).environmentObject(model.icons)
-        let size = fittedSize(for: b.secret, screen: screenSize())
+        let size = fittedSize(for: b.secret, screen: screenSize(), size: holder.textSize)
         let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         w.title = "Secret · \(b.name)"
         w.isReleasedWhenClosed = false
@@ -101,9 +106,33 @@ enum SecretWindows {
         holder.bookmark = b
         w.title = "Secret · \(b.name)"
         if textChanged, let content = w.contentView, content.frame.size == holder.fitted {
-            let size = fittedSize(for: b.secret, screen: screenSize())
+            let size = fittedSize(for: b.secret, screen: screenSize(), size: holder.textSize)
             w.setContentSize(size)
             holder.fitted = size
+        }
+    }
+
+    /// ⌘+ ⌘− ⌘0 in a secret window (Matt, Nov 8 2026): the text size of that one window, two points a step;
+    /// 0 = back to Settings' size. True when `w` is a secret window (the key was used up).
+    @discardableResult
+    static func adjustText(in w: NSWindow, by step: Int) -> Bool {
+        guard let id = windows.first(where: { $0.value === w })?.key, let holder = holders[id] else { return false }
+        let base = holder.model?.settings.secretTextSize ?? AppSettings.defaultTextSize
+        setTextSize(id, step == 0 ? base : holder.textSize + step * TextSizeKeys.step)
+        return true
+    }
+    static func textSize(_ id: UUID) -> Int? { holders[id]?.textSize }
+    /// development hook: every open window at once
+    static func setTextSizeEverywhere(_ size: Int) { for id in windows.keys { setTextSize(id, size) } }
+    static func setTextSize(_ id: UUID, _ size: Int) {
+        guard let w = windows[id], let holder = holders[id] else { return }
+        let clamped = AppSettings.clampText(size)
+        guard clamped != holder.textSize else { return }
+        holder.textSize = clamped
+        // the window fits its text again at the new size, unless it was resized by hand
+        if let content = w.contentView, content.frame.size == holder.fitted {
+            let s = fittedSize(for: holder.bookmark.secret, screen: screenSize(), size: clamped)
+            w.setContentSize(s); holder.fitted = s
         }
     }
 
@@ -130,13 +159,16 @@ enum SecretWindows {
         // brought forward or clicked into: the hide-after clock starts again
         func windowDidBecomeKey(_ n: Notification) {
             guard let w = n.object as? NSWindow else { return }
-            MainActor.assumeIsolated { SecretWindows.used(w) }
+            MainActor.assumeIsolated { SecretWindows.used(w); SecretWindows.model?.textWindowIsKey = true }
         }
+        func windowDidResignKey(_ n: Notification) { MainActor.assumeIsolated { SecretWindows.model?.textWindowIsKey = false } }
     }
 }
 
 final class SecretHolder: ObservableObject {
     @Published var bookmark: Bookmark
+    /// the text size of this window (points): Settings' size to begin with, then ⌘+ ⌘− ⌘0
+    @Published var textSize: Int
     /// the size the window was given to fit its text (a window still this size follows the text when it changes)
     var fitted = NSSize.zero
     /// hides the window after Settings' seconds
@@ -144,7 +176,7 @@ final class SecretHolder: ObservableObject {
     /// the last click, key or scroll in the window (or when it came forward)
     var lastUsed = Date()
     weak var model: AppModel?
-    init(bookmark: Bookmark) { self.bookmark = bookmark }
+    init(bookmark: Bookmark, textSize: Int = AppSettings.defaultTextSize) { self.bookmark = bookmark; self.textSize = textSize }
 }
 
 struct SecretView: View {
@@ -159,7 +191,7 @@ struct SecretView: View {
                 Image(systemName: "key.fill").foregroundStyle(Theme.accent)
                 Text("Select any part and copy it. Hide puts it away again.").font(DS.secondary).foregroundStyle(.secondary)
             }
-            ReadOnlyText(text: holder.bookmark.secret.isEmpty ? SecretView.emptyText : holder.bookmark.secret, muted: holder.bookmark.secret.isEmpty)
+            ReadOnlyText(text: holder.bookmark.secret.isEmpty ? SecretView.emptyText : holder.bookmark.secret, muted: holder.bookmark.secret.isEmpty, font: SecretWindows.font(holder.textSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack {
                 Spacer()
@@ -181,6 +213,7 @@ struct SecretView: View {
 struct ReadOnlyText: NSViewRepresentable {
     let text: String
     var muted = false
+    var font: NSFont = SecretWindows.font(AppSettings.defaultTextSize)
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSTextView.scrollableTextView()
         scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true; scroll.borderType = .bezelBorder
@@ -188,7 +221,7 @@ struct ReadOnlyText: NSViewRepresentable {
         tv.isEditable = false
         tv.isSelectable = true
         tv.isRichText = false
-        tv.font = SecretWindows.font
+        tv.font = font
         tv.textContainerInset = NSSize(width: 6, height: 8)
         tv.setAccessibilityLabel("The secret")
         apply(tv)
@@ -197,6 +230,7 @@ struct ReadOnlyText: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: Context) { if let tv = scroll.documentView as? NSTextView { apply(tv) } }
     private func apply(_ tv: NSTextView) {
         if tv.string != text { tv.string = text }
+        if tv.font != font { tv.font = font }
         tv.textColor = muted ? .secondaryLabelColor : .labelColor
     }
 }

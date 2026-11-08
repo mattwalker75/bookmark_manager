@@ -64,6 +64,8 @@ final class AppModel: ObservableObject {
         if settings.secretHideSeconds != oldValue.secretHideSeconds { SecretWindows.rearmAll() }
     } }
     @Published var settingsTab = "general"
+    /// a secret or notes window is the key window, so the View menu's text-size items apply to it
+    @Published var textWindowIsKey = false
     /// the last link check's outcome (kept on disk), and the one running now
     @Published var linkReport: LinkReport?
     @Published var linkProgress: LinkCheckProgress?
@@ -702,6 +704,13 @@ struct AppSettings: Codable, Equatable {
     var secretHideSeconds = AppSettings.defaultHideSeconds
     static let defaultHideSeconds = 300
     static let hideSecondsRange = 1...86_400
+    /// the text size, in points, a secret window and a notes window open with (Matt, Nov 8 2026); ⌘+ and ⌘−
+    /// change one window while it is open, ⌘0 puts it back to this
+    var secretTextSize = AppSettings.defaultTextSize
+    var notesTextSize = AppSettings.defaultTextSize
+    static let defaultTextSize = 14
+    static let textSizeRange = 9...36
+    static func clampText(_ s: Int) -> Int { min(textSizeRange.upperBound, max(textSizeRange.lowerBound, s)) }
     /// Touch ID (or the Mac's password) before a secret is shown
     var touchIDForSecrets = false
     /// check every address on its own every this many days; 0 = never (Matt, Oct 29 2026)
@@ -741,6 +750,8 @@ struct AppSettings: Codable, Equatable {
         secretHideSeconds = AppSettings.hideSeconds(try? c.decodeIfPresent(Int.self, forKey: .secretHideSeconds),
                                                     legacyMinutes: (try? d.container(keyedBy: LegacyKeys.self)).flatMap { try? $0.decodeIfPresent(Int.self, forKey: .secretHideMinutes) })
         touchIDForSecrets = read(.touchIDForSecrets, false)
+        secretTextSize = AppSettings.clampText(read(.secretTextSize, AppSettings.defaultTextSize))
+        notesTextSize = AppSettings.clampText(read(.notesTextSize, AppSettings.defaultTextSize))
         linkCheckDays = max(0, read(.linkCheckDays, 0))
         lastLinkCheckAt = readOptional(.lastLinkCheckAt)
         backupsEnabled = read(.backupsEnabled, true)

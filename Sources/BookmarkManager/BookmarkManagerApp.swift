@@ -50,6 +50,12 @@ struct BookmarkManagerApp: App {
                 Button("Show Notes") { model.showFocusedNotes() }.disabled(!(model.focusedBookmark?.hasNotes ?? false))
                 Button("Enclosing Directory") { model.goUp() }.keyboardShortcut(.upArrow, modifiers: .command).disabled(model.isSearching || model.selectedPath.isTabRoot)
             }
+            // the text in a secret or notes window (Matt, Nov 8 2026): the same keys TextSizeKeys takes when such a window is key
+            CommandGroup(after: .toolbar) {
+                Button("Bigger Text") { TextSizeKeys.adjustKeyWindow(by: 1) }.keyboardShortcut("+", modifiers: .command).disabled(!model.textWindowIsKey)
+                Button("Smaller Text") { TextSizeKeys.adjustKeyWindow(by: -1) }.keyboardShortcut("-", modifiers: .command).disabled(!model.textWindowIsKey)
+                Button("Default Text Size") { TextSizeKeys.adjustKeyWindow(by: 0) }.keyboardShortcut("0", modifiers: .command).disabled(!model.textWindowIsKey)
+            }
             CommandMenu("Tabs") {
                 ForEach(Array(model.library.tabs.prefix(9).enumerated()), id: \.element.id) { i, tab in
                     Button(tab.name) { model.selectTab(tab.id) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")))

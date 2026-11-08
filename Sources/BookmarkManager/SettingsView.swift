@@ -59,13 +59,21 @@ struct GeneralPane: View {
             }
             Section("Secrets") {
                 HideAfterRow()
-                Text("An open secret window closes by itself after this many seconds without being used — any number from \(AppSettings.hideSecondsRange.lowerBound) to \(AppSettings.hideSecondsRange.upperBound) (a day). Clicking into it starts the clock again. Notes windows never hide by themselves.")
+                Text("An open secret window closes by itself after this many seconds without being used — any number from \(AppSettings.hideSecondsRange.lowerBound) to \(AppSettings.hideSecondsRange.upperBound) (a day). Clicking into it starts the clock again.")
+                    .font(DS.secondary).foregroundStyle(.secondary)
+                TextSizeRow("Text size in a secret window", value: $model.settings.secretTextSize, monospaced: true)
+                Text("The size a secret window opens with. ⌘+ and ⌘− change one window while it is open; ⌘0 puts it back to this.")
                     .font(DS.secondary).foregroundStyle(.secondary)
                 Toggle("Ask for Touch ID before showing a secret", isOn: $model.settings.touchIDForSecrets)
                     .onChange(of: model.settings.touchIDForSecrets) { _, on in if !on { SecretGate.forget() } }
                 Text(SecretGate.available
                      ? "Touch ID, or your Mac's password where there is no Touch ID. One check covers the next minute, so several secrets in a row ask once."
                      : "This Mac has no Touch ID and no login password to check against, so the option can't do anything here.")
+                    .font(DS.secondary).foregroundStyle(.secondary)
+            }
+            Section("Notes") {
+                TextSizeRow("Text size in a notes window", value: $model.settings.notesTextSize)
+                Text("The size a notes window opens with. ⌘+ and ⌘− change one window while it is open; ⌘0 puts it back to this. Notes windows never hide by themselves.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
             Section("Links") {
@@ -138,6 +146,27 @@ struct GeneralPane: View {
 
 /// "Hide a secret window after [300] seconds (= 5 minutes)" and the Never switch (Matt, Nov 8 2026: seconds, any
 /// number — 5 or 999). The field keeps what is typed until it is a number; a number out of range is pulled back in.
+/// "Text size in a … window": a sample of the text at that size and a stepper, 9 to 36 points (Matt, Nov 8 2026).
+struct TextSizeRow: View {
+    let label: String
+    @Binding var value: Int
+    var monospaced = false
+    init(_ label: String, value: Binding<Int>, monospaced: Bool = false) { self.label = label; _value = value; self.monospaced = monospaced }
+
+    var body: some View {
+        LabeledContent(label) {
+            HStack(spacing: 10) {
+                Text(monospaced ? "Aa 0O 1l" : "Aa — the notes")
+                    .font(.system(size: CGFloat(value), design: monospaced ? .monospaced : .default)).lineLimit(1)
+                    .frame(minWidth: 120, alignment: .trailing)
+                    .accessibilityHidden(true)
+                Stepper("\(value) pt", value: Binding(get: { value }, set: { value = AppSettings.clampText($0) }), in: AppSettings.textSizeRange)
+                    .monospacedDigit().accessibilityLabel(label)
+            }
+        }
+    }
+}
+
 struct HideAfterRow: View {
     @EnvironmentObject var model: AppModel
     @State private var text = ""

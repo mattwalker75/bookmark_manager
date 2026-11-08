@@ -14,12 +14,16 @@ enum NotesWindows {
 
     /// the smallest the window is ever made (the tip line and the buttons fit)
     static let floor = NSSize(width: 440, height: 220)
-    /// notes are prose: the system font, not the secrets' monospaced one
-    static let font = NSFont.systemFont(ofSize: NSFont.systemFontSize + 1)
+    /// notes are prose: the system font, not the secrets' monospaced one — at `size` points (Settings' notes text
+    /// size; ⌘+ ⌘− in the window, Matt, Nov 8 2026)
+    nonisolated static func font(_ size: Int) -> NSFont { NSFont.systemFont(ofSize: CGFloat(size)) }
+    /// the model the windows belong to (for the View menu's text-size items)
+    static weak var model: AppModel?
 
     /// The window size that shows the whole text without scrolling (measured in its font plus the chrome), never
     /// smaller than `floor`, never wider than 60% or taller than 70% of `screen`. Longer notes scroll inside.
-    static func fittedSize(for text: String, screen: NSSize) -> NSSize {
+    static func fittedSize(for text: String, screen: NSSize, size: Int = AppSettings.defaultTextSize) -> NSSize {
+        let font = NotesWindows.font(size)
         let shown = text.isEmpty ? NotesView.emptyText : text
         let lines = shown.components(separatedBy: "\n")
         let lineHeight = ceil(font.ascender - font.descender + font.leading)
@@ -47,10 +51,11 @@ enum NotesWindows {
     static func show(_ b: Bookmark, model: AppModel) {
         guard b.hasNotes else { return }
         if let w = windows[b.id] { holders[b.id]?.bookmark = b; w.makeKeyAndOrderFront(nil); return }
-        let holder = NotesHolder(bookmark: b)
+        let holder = NotesHolder(bookmark: b, textSize: model.settings.notesTextSize)
         holder.model = model
+        NotesWindows.model = model
         let view = NotesView(holder: holder, model: model).environmentObject(model).environmentObject(model.icons)
-        let size = fittedSize(for: b.notes, screen: screenSize())
+        let size = fittedSize(for: b.notes, screen: screenSize(), size: holder.textSize)
         let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         w.title = "Notes · \(b.name)"
         w.isReleasedWhenClosed = false
@@ -73,9 +78,33 @@ enum NotesWindows {
         holder.bookmark = b
         w.title = "Notes · \(b.name)"
         if textChanged, !holder.editing, let content = w.contentView, content.frame.size == holder.fitted {
-            let size = fittedSize(for: b.notes, screen: screenSize())
+            let size = fittedSize(for: b.notes, screen: screenSize(), size: holder.textSize)
             w.setContentSize(size)
             holder.fitted = size
+        }
+    }
+
+    /// ⌘+ ⌘− ⌘0 in a notes window (Matt, Nov 8 2026): the text size of that one window, two points a step;
+    /// 0 = back to Settings' size. True when `w` is a notes window (the key was used up).
+    @discardableResult
+    static func adjustText(in w: NSWindow, by step: Int) -> Bool {
+        guard let id = windows.first(where: { $0.value === w })?.key, let holder = holders[id] else { return false }
+        let base = holder.model?.settings.notesTextSize ?? AppSettings.defaultTextSize
+        setTextSize(id, step == 0 ? base : holder.textSize + step * TextSizeKeys.step)
+        return true
+    }
+    static func textSize(_ id: UUID) -> Int? { holders[id]?.textSize }
+    /// development hook: every open window at once
+    static func setTextSizeEverywhere(_ size: Int) { for id in windows.keys { setTextSize(id, size) } }
+    static func setTextSize(_ id: UUID, _ size: Int) {
+        guard let w = windows[id], let holder = holders[id] else { return }
+        let clamped = AppSettings.clampText(size)
+        guard clamped != holder.textSize else { return }
+        holder.textSize = clamped
+        // the window fits its text again at the new size, unless it was resized by hand (or is being typed in)
+        if !holder.editing, let content = w.contentView, content.frame.size == holder.fitted {
+            let s = fittedSize(for: holder.bookmark.notes, screen: screenSize(), size: clamped)
+            w.setContentSize(s); holder.fitted = s
         }
     }
 
@@ -111,6 +140,8 @@ enum NotesWindows {
             guard let w = n.object as? NSWindow else { return }
             MainActor.assumeIsolated { NotesWindows.forget(w) }
         }
+        func windowDidBecomeKey(_ n: Notification) { MainActor.assumeIsolated { NotesWindows.model?.textWindowIsKey = true } }
+        func windowDidResignKey(_ n: Notification) { MainActor.assumeIsolated { NotesWindows.model?.textWindowIsKey = false } }
         /// Closing with changes in hand asks first (the window's own sheet): Save / Don't Save / Cancel.
         func windowShouldClose(_ w: NSWindow) -> Bool {
             MainActor.assumeIsolated {
@@ -142,11 +173,13 @@ final class NotesHolder: ObservableObject {
     /// the text box is on (Edit was clicked); `draft` is what is being typed
     @Published var editing = false { didSet { updateEdited() } }
     @Published var draft = "" { didSet { updateEdited() } }
+    /// the text size of this window (points): Settings' size to begin with, then ⌘+ ⌘− ⌘0
+    @Published var textSize: Int
     /// the size the window was given to fit its text (a window still this size follows the text when it changes)
     var fitted = NSSize.zero
     weak var model: AppModel?
     weak var window: NSWindow?
-    init(bookmark: Bookmark) { self.bookmark = bookmark }
+    init(bookmark: Bookmark, textSize: Int = AppSettings.defaultTextSize) { self.bookmark = bookmark; self.textSize = textSize }
 
     var isDirty: Bool { editing && draft != bookmark.notes }
     /// the macOS dot in the close button
@@ -177,7 +210,7 @@ struct NotesView: View {
                 Text(holder.editing ? "Type your changes. Save keeps them (⌘S); Cancel puts the notes back." : "Plain notes for yourself. They stay open as long as you like; Edit to change them.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
-            NotesText(text: $holder.draft, shown: holder.bookmark.notes.isEmpty ? NotesView.emptyText : holder.bookmark.notes, editable: holder.editing, muted: holder.bookmark.notes.isEmpty, openLink: { model.openLinkFromNotes($0) })
+            NotesText(text: $holder.draft, shown: holder.bookmark.notes.isEmpty ? NotesView.emptyText : holder.bookmark.notes, editable: holder.editing, muted: holder.bookmark.notes.isEmpty, font: NotesWindows.font(holder.textSize), openLink: { model.openLinkFromNotes($0) })
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 8) {
                 Text(lastEdited).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1)
@@ -228,6 +261,7 @@ struct NotesText: NSViewRepresentable {
     let shown: String
     let editable: Bool
     var muted = false
+    var font: NSFont = NotesWindows.font(AppSettings.defaultTextSize)
     let openLink: (URL) -> Void
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -237,7 +271,7 @@ struct NotesText: NSViewRepresentable {
         tv.delegate = context.coordinator
         tv.isRichText = false
         tv.allowsUndo = true
-        tv.font = NotesWindows.font
+        tv.font = font
         tv.textContainerInset = NSSize(width: 6, height: 8)
         tv.isAutomaticQuoteSubstitutionEnabled = false
         tv.isAutomaticDashSubstitutionEnabled = false
@@ -257,20 +291,22 @@ struct NotesText: NSViewRepresentable {
             let wasReading = !tv.isEditable
             tv.isEditable = true; tv.isSelectable = true
             if wasReading || (tv.window?.firstResponder !== tv && tv.string != text) {
-                tv.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: [.font: NotesWindows.font, .foregroundColor: NSColor.labelColor]))
+                tv.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: NSColor.labelColor]))
             }
+            // ⌘+ ⌘− while typing: plain text, so the one font covers it all
+            if tv.font != font { tv.font = font; tv.textStorage?.addAttribute(.font, value: font, range: NSRange(location: 0, length: tv.textStorage?.length ?? 0)) }
             if wasReading { DispatchQueue.main.async { tv.window?.makeFirstResponder(tv); tv.setSelectedRange(NSRange(location: tv.string.utf16.count, length: 0)) } }
         } else {
             tv.isEditable = false; tv.isSelectable = true
-            if tv.string != shown || context.coordinator.lastMuted != muted {
-                tv.textStorage?.setAttributedString(NotesText.linked(shown, muted: muted))
-                context.coordinator.lastMuted = muted
+            if tv.string != shown || context.coordinator.lastMuted != muted || context.coordinator.lastFont != font {
+                tv.textStorage?.setAttributedString(NotesText.linked(shown, muted: muted, font: font))
+                context.coordinator.lastMuted = muted; context.coordinator.lastFont = font
             }
         }
     }
     /// The text with every web address made clickable.
-    static func linked(_ s: String, muted: Bool) -> NSAttributedString {
-        let a = NSMutableAttributedString(string: s, attributes: [.font: NotesWindows.font, .foregroundColor: muted ? NSColor.secondaryLabelColor : NSColor.labelColor])
+    static func linked(_ s: String, muted: Bool, font: NSFont = NotesWindows.font(AppSettings.defaultTextSize)) -> NSAttributedString {
+        let a = NSMutableAttributedString(string: s, attributes: [.font: font, .foregroundColor: muted ? NSColor.secondaryLabelColor : NSColor.labelColor])
         if let det = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) {
             for m in det.matches(in: s, range: NSRange(location: 0, length: (s as NSString).length)) {
                 if let u = m.url, ["http", "https", "mailto"].contains(u.scheme?.lowercased() ?? "") { a.addAttribute(.link, value: u, range: m.range) }
@@ -283,6 +319,7 @@ struct NotesText: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: NotesText
         var lastMuted: Bool?
+        var lastFont: NSFont?
         init(_ p: NotesText) { parent = p }
         func textDidChange(_ n: Notification) {
             guard let tv = n.object as? NSTextView, parent.editable else { return }
