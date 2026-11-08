@@ -2,7 +2,9 @@
 
 All notable changes to Bookmark Manager (Keep a Changelog style; dates are when the change was made).
 
-## [Unreleased]
+## [1.0.0] — 2026-11-08
+
+Matt, Nov 8 2026: in daily use with zero issues, so this is 1.0 — with the three tweaks below.
 
 ### Added
 - 2026-11-08: **Notes on a bookmark** (Matt; mockups: row A, window A) — tick *This bookmark has notes* in the

@@ -22,7 +22,7 @@ icon/                          icon.svg (Tabbed folder) → make_icns.sh → Boo
 ## Build and test
 ```bash
 swift build          # debug build of everything
-swift test           # 126 tests, under a minute
+swift test           # 140 tests, under a minute
 ./BUILD_APP.sh       # build/Bookmark Manager.app (release, ad-hoc signed)
 ```
 
