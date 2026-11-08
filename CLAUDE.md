@@ -5,14 +5,16 @@ Read this before changing anything. `Docs/` has the detail.
 ## What it is
 A Mac app (Swift + SwiftUI, macOS 14+, no Xcode project — SwiftPM + `BUILD_APP.sh`, modelled on
 `../app_starter` and `../data_syncer`) that keeps Matt's bookmarks in **tabs › directories › sub-directories**,
-each bookmark with a name, description, address, tags, a color code and an optional multi-line **secret**.
+each bookmark with a name, description, address, tags, a color code, an optional multi-line **secret** and optional
+plain **notes**.
 One window, a live search across every tab, export / validate / import as JSON. This Mac only. The person using
 it is not a developer: every message is a plain sentence.
 
 ## Map
 - `Sources/BookmarkManagerCore/` — no UI, tested on its own.
   - `Models.swift` — Library (maxDepth, colors, tabs) → Folder (a tab, directory or sub-directory: name, description,
-    colorId, folders, bookmarks) → Bookmark (name, description, url, tags, colorId, hasSecret, secret). FolderPath
+    colorId, folders, bookmarks) → Bookmark (name, description, url, tags, colorId, hasSecret, secret, hasNotes,
+    notes, notesEditedAt, browser, skipLinkCheck, skipDuplicateCheck). FolderPath
     (`[tabId, folderId…]`). Every rule that refuses something throws `BMError` with the sentence the window shows.
   - `Arrange.swift` — `Library.move(DragItem, to:before:)`: the ONE function for drag/drop and Move to…
   - `Search.swift` — `Library.search` (names, addresses, tags; directory names) → `SearchHit` with its path.
@@ -24,7 +26,8 @@ it is not a developer: every message is a plain sentence.
   turns a refusal into a `Notice` and saves on success). `MainWindow` (SearchBar, TabBar, FolderTree, FolderDetail,
   BookmarkRow, SubfolderRow, drag/drop helpers), `SearchResults`, `Editors` (BookmarkEditor, FolderEditor,
   TabNameSheet, MoveSheet, ColorPills, DestinationPicker, BrowserPicker), `SecretWindow` (one NSWindow per bookmark,
-  self-sizing, hide timer), `SecretGate` (Touch ID), `LinkCheck` + `LinkCheckView` (the link check and its sheet /
+  self-sizing, hide timer), `NotesWindow` (the notes window: read first, Edit, Save/Cancel, the two questions),
+  `SecretGate` (Touch ID), `LinkCheck` + `LinkCheckView` (the link check and its sheet /
   banner), `DuplicatesView` (the duplicates sheet), `SettingsView` (General, Color codes, Appearance, Backups, Export & import + ValidationSheet),
   `BackupsView` (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet), `Browsers`, `Icons` (IconCache +
   IconFetcher), `Sample`. `MainWindow` also holds `KeyboardDriver`, `TreeBranch`, `TreeRow`. The look is App Starter's / Data Syncer's: `Design.swift`, `Themes.swift`,
@@ -58,7 +61,7 @@ it is not a developer: every message is a plain sentence.
    installed, else the Settings browser with a one-time sentence.
 5a. **The keyboard** (Matt, Oct 29 2026): `AppModel.focusId` is the row under ↑ ↓ (`keyboardRows` = the page's
     sub-directories then bookmarks, or the hits grouped by tab exactly as shown); Return `activateFocus`, Space the
-    secret, ⌘L `copyFocusedAddress`, ⌘↑ `goUp` (the directory just left stays focused); Tabs menu ⌘1–9, ⌃Tab.
+    secret, ⇧Space the notes, ⌘L `copyFocusedAddress`, ⌘↑ `goUp` (the directory just left stays focused); Tabs menu ⌘1–9, ⌃Tab.
     `KeyboardDriver` is ONE local key monitor on the main window: nothing while a sheet is up or another text view
     has the cursor; in the search box only ↑ ↓ Return are taken. Focus clears on select / tab / typing. Rows carry
     `.id()` so the page scrolls to the focused row.
@@ -84,13 +87,25 @@ it is not a developer: every message is a plain sentence.
     **Web page / Secret only** picker; Secret only hides the Address row and the switch, clears the address on save,
     and refuses a NEW secret with nothing typed (an imported blank one may be edited). Validate: no address is a
     stop only when there is no secret either.
+6b. **Notes** (Matt, Nov 8 2026; mockup canvas 9XJEph4sNJnhKEHZfjvCe7 — row A, window A): `Bookmark.hasNotes` +
+    `notes` + `notesEditedAt`, PLAIN TEXT in library.json (not a secret, never encrypted), in EVERY export and backup,
+    searched (`match` adds "notes"; my default, Matt had no say). Switched on/off in the editor like the secret
+    (off with text asks first); may be on with nothing typed. The row shows a **Notes** button (`doc.text`) only
+    while `hasNotes` — no preview line on the row (Matt: too much text). `NotesWindows` (one per bookmark, sized
+    like the secret window, floor 440×220, NO hide timer, no Touch ID): opens READ-ONLY with clickable addresses;
+    **Edit** turns the box on (Matt: no accidental typing), then Cancel / Save (⌘S, grey until changed);
+    `isDocumentEdited` dot; closing dirty asks Save / Don't Save / Cancel; quitting asks once for all
+    (`settleBeforeQuit`, before the quit backup). **Delete notes…** asks (Cancel default) then `deleteNotes` turns
+    `hasNotes` OFF — the button goes until the editor turns it on again (Matt). The library stamps
+    `notesEditedAt` on add/update when the text changed ("Last edited …"). ⇧Space / Show Notes menu item.
+    Prose: system font, spelling checked, no smart quotes (notes hold commands). `TextBox(monospaced: false)`.
 7. **Export** is one JSON (`ExportFile`: tabs, directories, bookmarks, colors, maxDepth). "Include the secrets" is a
    checkbox that **defaults OFF**; on, the file holds them decrypted and the pane says so. **Validate** lists every
    problem with its place (`Transfer.validate`, stops vs notes) and changes nothing; Import validates first, then
    Replace everything (confirmed) or Add its tabs (fresh ids). Replace without secrets keeps local secrets by id.
 8. **Color codes:** in the library (so they export): 4 defaults, up to `ColorCode.maximum` (10), any color + name;
    removing one clears it everywhere (Remove always asks and says how many lose it). Tags are search-only, never shown on rows.
-9. **Search** covers every tab, every word must match (name, address, tags; directory names — NOT descriptions);
+9. **Search** covers every tab, every word must match (name, address, tags, notes; directory names — NOT descriptions);
    results are grouped by tab with the path; "Show in place" selects the directory and flashes the row (`highlightId`).
 10. **Site icons** are fetched once per host into `<home>/icons/<host>.png` (`<host>_<port>.png` with a port) (any certificate accepted, http allowed via
     `NSAllowsArbitraryLoads` — on its own, see App Starter), a failure is remembered until relaunch, the link glyph

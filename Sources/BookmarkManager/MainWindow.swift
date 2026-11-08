@@ -55,7 +55,7 @@ struct MainWindow: View {
     }
 
     /// Development only, harmless when unset (for trying screens on a scratch BOOKMARKMANAGER_HOME):
-    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|duplicates|search:<text>|settings[:tab]
+    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|notes[:<name prefix>]|notesedit:<name prefix>|edit:<name prefix>|duplicates|search:<text>|settings[:tab]
     private func developmentHooks() {
         guard let hooks = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_AUTOSHEET"] else { return }
         // several steps separated by ";" run a second apart: "search:admin;keys:125,125,36"
@@ -77,6 +77,7 @@ struct MainWindow: View {
             case "newTab": model.sheet = .newTab
             case "move": if let b { model.sheet = .move(.bookmark(b.id)) }
             case "secret": if let b { model.showSecret(b) }
+            case "notes": if let n = model.library.allBookmarks.first(where: \.hasNotes) { model.showNotes(n) }
             case "linkcheck": model.checkLinks()
             case "duplicates": model.sheet = .duplicates
             case "backupcheck":
@@ -97,6 +98,9 @@ struct MainWindow: View {
                 if sheet.hasSuffix(":sheet") { model.sheet = .linkReport }
             default:
                 if sheet.hasPrefix("secret:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(7))) }) { model.showSecret(b) }
+                if sheet.hasPrefix("notes:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(6))) }) { model.showNotes(b) }
+                if sheet.hasPrefix("notesedit:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(10))) }) { model.showNotes(b); NotesWindows.holder(b.id)?.beginEdit() }
+                if sheet.hasPrefix("edit:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(5))) }) { model.sheet = .editBookmark(b) }
                 if sheet.hasPrefix("search:") { model.query = String(sheet.dropFirst(7)) }
                 if sheet.hasPrefix("keys:"), let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
                     // key codes (125 ↓, 126 ↑, 36 Return, 49 Space) posted to the window like real key presses
@@ -150,8 +154,10 @@ enum KeyboardDriver {
         case 36, 76:                                 // Return, Enter
             guard model.focusId != nil else { return false }
             model.activateFocus(); return true
-        case 49:                                     // Space
-            guard !inSearch, let b = model.focusedBookmark, b.hasSecret else { return false }
+        case 49:                                     // Space (⇧Space: the notes)
+            guard !inSearch, let b = model.focusedBookmark else { return false }
+            if e.modifierFlags.contains(.shift) { guard b.hasNotes else { return false }; model.showNotes(b); return true }
+            guard b.hasSecret else { return false }
             model.showSecret(b); return true
         default: return false
         }
@@ -168,7 +174,7 @@ struct SearchBar: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSSearchField {
         let f = NSSearchField()
-        f.placeholderString = "Search bookmarks by name, address or tag"
+        f.placeholderString = "Search bookmarks by name, address, tag or notes"
         f.delegate = context.coordinator
         f.sendsSearchStringImmediately = true
         f.sendsWholeSearchString = false
@@ -468,7 +474,7 @@ struct FolderDetail: View {
                                 Text("No bookmarks at this level — they are in the \(path.depth == 0 ? "directories" : "sub-directories") above.").font(DS.secondary).foregroundStyle(.secondary).padding(.top, 4)
                             }
                             EndDrop(path: path)
-                            Text("Click a name to open it in \(browserName). Drag a row onto a directory or a tab to move it; right-click for more. ↑ ↓ walk the rows, Return opens, Space shows a secret.")
+                            Text("Click a name to open it in \(browserName). Drag a row onto a directory or a tab to move it; right-click for more. ↑ ↓ walk the rows, Return opens, Space shows a secret, ⇧Space the notes.")
                                 .font(DS.secondary).foregroundStyle(.tertiary).padding(.top, 8)
                         }
                         .padding(.horizontal, 28).padding(.bottom, 24)
@@ -653,6 +659,10 @@ struct BookmarkRow: View {
                 Button { model.showSecret(bookmark) } label: { Label(bookmark.secretButtonTitle, systemImage: "key.fill").font(DS.secondary) }
                     .buttonStyle(.bordered).controlSize(.small).help("Show the secret in its own window")
             }
+            if bookmark.hasNotes {
+                Button { model.showNotes(bookmark) } label: { Label("Notes", systemImage: "doc.text").font(DS.secondary) }
+                    .buttonStyle(.bordered).controlSize(.small).help("Show the notes in their own window")
+            }
             Button { model.sheet = .editBookmark(bookmark) } label: { Image(systemName: "pencil").font(.system(size: 12, weight: .semibold)) }
                 .buttonStyle(.bordered).controlSize(.small).help("Edit this bookmark").accessibilityLabel("Edit \(bookmark.name)")
                 .opacity(over ? 1 : 0)
@@ -678,6 +688,7 @@ struct BookmarkRow: View {
                 Button("Copy address") { model.copyAddress(bookmark) }
             }
             if bookmark.hasSecret { Button("Show secret") { model.showSecret(bookmark) } }
+            if bookmark.hasNotes { Button("Show notes") { model.showNotes(bookmark) } }
             if problem != nil {
                 Button("Clear link mark") { model.clearLinkProblem(bookmark.id, forever: false) }
                 Button("Clear link mark and leave out of link checks") { model.clearLinkProblem(bookmark.id, forever: true) }

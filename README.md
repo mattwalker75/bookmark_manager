@@ -10,7 +10,7 @@ tags, a color code and, when you need one, a **secret** on each bookmark.
   blank lines between — kept encrypted on this Mac and shown in its own window only when you click **Secret** (or press Space on the row).
 - **Directories** have an optional description and color too. A tab or directory can only be deleted once it is
   empty, so a full one is never deleted by accident.
-- **Search** at the top: every word must be found in a bookmark's name, address or tags (or a directory's name),
+- **Search** at the top: every word must be found in a bookmark's name, address, tags or notes (or a directory's name),
   in any tab. Each result shows where it lives; **Show in place** jumps there.
 - Click a name (or press Return on the row) to open it in the browser you chose in Settings — or the one that
   bookmark names. Drag rows between directories and tabs.
@@ -18,10 +18,13 @@ tags, a color code and, when you need one, a **secret** on each bookmark.
   them; the row gets a light wash of the color.
 - A bookmark can also be a **secret only** — no address at all (a passphrase, the Wi-Fi password): same list, a key
   for an icon, a **Secrets-Only** button. A bookmark may name its own browser ("Opens in", in the editor).
+- **Notes** on any bookmark: plain text for yourself (where you left off, how to get around a site) in a window
+  of its own that stays open as long as you like — read-only until you click Edit, Save or Don't Save on close.
+  Not secrets: in every export and backup, found by the search.
 - **Secret windows** size themselves to their text, hide themselves after a number of seconds you choose (Settings), and can ask for
   **Touch ID** first (Settings).
 - **Directories collapse** in the folder tree with chevrons, and remember what you left open.
-- **The keyboard**: ↑ ↓ walk the rows, Return opens, Space shows a secret, ⌘L copies the address, ⌘↑ goes up,
+- **The keyboard**: ↑ ↓ walk the rows, Return opens, Space shows a secret, ⇧Space the notes, ⌘L copies the address, ⌘↑ goes up,
   ⌘1 … ⌘9 switch tabs.
 - **Check links**: ask every address (or one directory's) once and see which are gone, moved or didn't answer,
   with marks on the rows; an optional weekly or monthly schedule.

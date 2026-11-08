@@ -3,18 +3,18 @@
 ## Layout
 ```
 Sources/BookmarkManagerCore/   Models · Arrange · Search · Store · SecretBox · Transfer · Favicons · Backup (BackupFile,
-                               PassphraseWrap, Backup, BackupStore) · Version
+                               PassphraseWrap, Backup, BackupStore) · Duplicates · Version
 Sources/BookmarkManager/       BookmarkManagerApp (+ AppDelegate) · AppModel · MainWindow (KeyboardDriver, SearchBar, TabBar,
                                FolderTree, TreeBranch, TreeRow, FolderDetail, SubfolderRow, BookmarkRow, SiteIcon, DropGap, EndDrop)
                                SearchResults · Editors (BookmarkEditor, BrowserPicker, ColorPills, DestinationPicker, FolderEditor,
-                               TabNameSheet, MoveSheet) · SecretWindow · SecretGate (Touch ID) · LinkCheck (LinkVerdict, LinkReport,
+                               TabNameSheet, MoveSheet) · SecretWindow · NotesWindow (NotesWindows, NotesHolder, NotesView, NotesText) · SecretGate (Touch ID) · LinkCheck (LinkVerdict, LinkReport,
                                LinkChecker) · LinkCheckView (LinkReportSheet, LinkBanner) · DuplicatesView (DuplicatesSheet, DuplicateRow) · SettingsView (GeneralPane, ColorCodesPane,
                                TransferPane, ValidationSheet) · BackupsView (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet)
                                Browsers · Icons (IconCache, IconFetcher) · Sample
                                Design · Themes · AppearancePane · PlainTextField · TextBox   ← adapted from App Starter (Themes adds
                                                               RGB.color and drops the bundle light; AppearancePane reworded; TextBox = ScriptEditor), keep in step
-Tests/BookmarkManagerCoreTests/  Models · Arrange · Search · Store · Transfer · Favicon · Backup · Duplicates · ReviewFix tests · Helpers (Scratch, Sample)
-Tests/BookmarkManagerTests/      AppModel, LinkCheck, DuplicatesModel, BackupModel and the review tests (each on a scratch BOOKMARKMANAGER_HOME;
+Tests/BookmarkManagerCoreTests/  Models · Arrange · Search · Store · Transfer · Favicon · Backup · Duplicates · Notes · ReviewFix tests · Helpers (Scratch, Sample)
+Tests/BookmarkManagerTests/      AppModel, LinkCheck, DuplicatesModel, NotesModel, BackupModel and the review tests (each on a scratch BOOKMARKMANAGER_HOME;
                                  Home.folder() refuses the real folder under xctest anyway); TinyHTTP / SlowHTTP serve 127.0.0.1 only
 icon/                          icon.svg (Tabbed folder) → make_icns.sh → BookmarkManager.icns (committed)
 ```
@@ -43,6 +43,14 @@ rows counted) between a floor and 60 % × 70 % of the screen; a changed secret r
 Each holder has a hide timer (`arm`) wound from the last click, key or scroll in the window (one event monitor
 for all secret windows); changing the seconds re-arms every open window. `SecretGate` asks Touch ID (or the Mac's
 password) before `showSecret` when Settings say so; one pass covers 60 s; one prompt at a time.
+
+Notes windows (`NotesWindows`, Nov 8 2026) are built the same way, minus the hide timer and the gate: a
+`NotesHolder` carries the bookmark, `editing` and the `draft`; `isDirty` = editing and the draft differs from what
+is saved (the window's `isDocumentEdited` dot follows it). `NotesText` is one NSTextView: read mode shows the saved
+text with addresses made links (`NSDataDetector`; a click goes through `AppModel.openLinkFromNotes`), edit mode is a
+plain text box. `windowShouldClose` asks Save / Don't Save / Cancel as a sheet when dirty; `settleBeforeQuit` asks
+once for all dirty windows before the quit-time backup. `AppModel.saveNotes` / `deleteNotes` go through
+`updateBookmark`; the library stamps `notesEditedAt` when the text changed. Notes live in library.json (plain).
 
 Site icons: `IconCache.image(for:fetch:)` answers from memory or `<home>/icons/<host>.png`, else queues one fetch
 (at most `atOnce` = 4 running; `IconFetcher`: the site ROOT's HTML — never the bookmark's path — →
@@ -87,8 +95,8 @@ with the library exactly as in library.json (plus the secrets when included).
 ## Development hooks (harmless when unset)
 - `BOOKMARKMANAGER_HOME=<folder>` — use a scratch folder instead of Application Support. **Always** for trying things.
 - `BOOKMARKMANAGER_SAMPLE=1` — with an empty home, fill in example tabs and bookmarks (`Sample.swift`).
-- `BOOKMARKMANAGER_AUTOSHEET=newBookmark | editBookmark | newFolder | editFolder | newTab | move | secret |
-  search:<text> | settings[:general|colors|appearance|backups|transfer]` — open that sheet / window a second after launch
+- `BOOKMARKMANAGER_AUTOSHEET=newBookmark | editBookmark | edit:<name prefix> | newFolder | editFolder | newTab | move | secret |
+  notes | notes:<name prefix> | notesedit:<name prefix> | search:<text> | settings[:general|colors|appearance|backups|transfer]` — open that sheet / window a second after launch
   (`newSecret` opens the bookmark editor with Secret only picked; `secret:<name prefix>` opens that bookmark's secret
   window, e.g. `secret:Backup` for the long sample secret; `keys:125,125,36` posts those key codes to the main
   window like real presses — 125 ↓, 126 ↑, 36 Return, 49 Space). Several steps run a second apart when separated

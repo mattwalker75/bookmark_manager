@@ -50,8 +50,10 @@ hidden until you ask for it.
   - **Color** — one of the color codes from Settings; the row gets a light wash of that color.
   - **Secret** — tick *This bookmark has a secret* and type as many lines as you like (a user name, a password, a
     recovery address, a token, blank lines between for reading). It is kept encrypted on this Mac.
-- The row shows the icon, the name, the description, a **Secret** button when there is one, and a pencil while
-  the pointer is over it. Right-click for Open, Copy address, Show secret, Edit…, Move to…, Delete….
+  - **Notes** — tick *This bookmark has notes* and type plain notes for yourself (see Notes). Not a secret.
+- The row shows the icon, the name, the description, a **Secret** button and a **Notes** button when there are
+  any, and a pencil while the pointer is over it. Right-click for Open, Copy address, Show secret, Show notes,
+  Edit…, Move to…, Delete….
 - A **secret-only** item sits in the same list as everything else (drag it, color it, move it like any row). Its
   row shows a key instead of a site icon, its name opens nothing, and its button says **Secrets-Only** — click
   that, exactly as you click Secret on a web bookmark. Without a description the row says "Secret only — no address".
@@ -75,6 +77,24 @@ hidden until you ask for it.
   the next minute, so opening several secrets in a row asks once. Turn it off there whenever you like.
 - Secrets never go into the bookmarks file, and go into an export only when you tick the box (see Export).
 
+## Notes
+- A bookmark can carry **notes**: plain text for yourself — where you left off on a project ("hero photo swapped,
+  still need the phone crop"), or how to find your way around a site that hides things ("Billing is under
+  Account › Billing › Invoices, not Payments"). Notes are **not secrets**: they are kept as they are in the
+  bookmarks file, go into every export and backup, and the search finds them.
+- Tick **This bookmark has notes** in the editor and type as many lines as you like (or nothing yet). The row then
+  shows a **Notes** button beside the Secret one; a secret-only item can have notes too.
+- Click **Notes** (or press ⇧Space on the row, or right-click → Show notes) and the notes open in a window of
+  their own, sized to the text like a secret window, that you can move around and leave open all day — it never
+  hides by itself. It opens **read-only**, so nothing can be typed into it by accident; addresses in it are
+  clickable. **Edit** turns the text box on; then **Save** (⌘S) keeps what you typed and **Cancel** puts the
+  notes back. Close the window with changes in hand and it asks: *Save*, *Don't Save* or *Cancel* (quitting the
+  app asks too). The bottom line says when the notes were last changed.
+- **Delete notes…** asks first, then throws the notes away and turns them off: the bookmark stays, the Notes
+  button goes. To have notes again, tick the switch in the editor and type them. Turning the switch off in the
+  editor asks the same question.
+- **Open bookmark** in the window opens the site, so instructions and the site sit side by side.
+
 ## Arranging
 - Bookmarks and directories stay in the order you put them. **Sort by name** on a directory's page sorts that
   directory's sub-directories and bookmarks once; after that the order is yours again.
@@ -85,16 +105,16 @@ hidden until you ask for it.
 - A move that can't work — a directory into itself, or deeper than the levels allow — is refused with the reason.
 
 ## Search
-- The box in the title bar (⌘F) searches as you type: every word must be found in a bookmark's **name, address or
-  tags**, or in a **directory's name**, in **every tab**. Descriptions are not searched.
+- The box in the title bar (⌘F) searches as you type: every word must be found in a bookmark's **name, address,
+  tags or notes**, or in a **directory's name**, in **every tab**. Descriptions are not searched.
 - Results are grouped by tab. Each shows where it lives (*Work › Self-hosted apps › Admin pages*), what matched,
-  and the Secret button. Click a name to open it; **Show in place** switches to its tab, opens its directory and
+  and the Secret and Notes buttons. Click a name to open it; **Show in place** switches to its tab, opens its directory and
   marks the row for a moment. **Clear** (or Esc in the box) goes back.
 
 ## The keyboard
 - **↑ ↓** walk the rows of the open directory (sub-directories first, then bookmarks); the row under the keys
   gets the accent outline. **Return** opens it: a bookmark in your browser, a secret-only item's secret, a
-  sub-directory on the page. **Space** shows the row's secret. **⌘L** copies its address. **⌘↑** goes up to the
+  sub-directory on the page. **Space** shows the row's secret, **⇧Space** its notes. **⌘L** copies its address. **⌘↑** goes up to the
   enclosing directory, with the one you left under the keys.
 - While the cursor is in the search box, ↑ ↓ walk the results and Return opens the one under the keys; every
   other key keeps typing.
@@ -154,7 +174,7 @@ hidden until you ask for it.
 
 ## Export, validate and import
 - **Export…** writes everything — tabs, directories, sub-directories, bookmarks with their descriptions,
-  addresses, tags and colors, the color codes, the directory-levels setting — as one `.json` file. Easy to read,
+  addresses, tags, notes and colors, the color codes, the directory-levels setting — as one `.json` file. Easy to read,
   easy to keep as a backup.
   - **Include the secrets** is off unless you tick it. Ticked, the file holds every secret decrypted, in plain
     text — keep that file somewhere safe and delete it when you are done.

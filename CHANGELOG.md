@@ -5,6 +5,16 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
 ## [Unreleased]
 
 ### Added
+- 2026-11-08: **Notes on a bookmark** (Matt; mockups: row A, window A) — tick *This bookmark has notes* in the
+  editor and type plain notes for yourself: where you left off on a project, how to find your way around a site
+  that hides things. Not a secret: kept as they are, in every export and backup, found by the search. The row
+  shows a **Notes** button beside Secret (only while notes are on; a secret-only item can have them too). The
+  notes open in a window of their own — sized to the text, movable, never hidden by itself — **read-only** until
+  you click **Edit** (no accidental typing); then **Save** (⌘S) or **Cancel**. Closing with changes asks *Save /
+  Don't Save / Cancel*; so does quitting. **Delete notes…** asks first, then turns the notes off (the button goes
+  until the editor turns them on again). Addresses in the notes are clickable; **Open bookmark** opens the site;
+  the bottom line says when the notes were last changed. ⇧Space on a row shows its notes; the Bookmarks menu has
+  **Show Notes**.
 - 2026-11-08: **Find duplicate bookmarks** (Matt) — Settings → General → Duplicates → *Find duplicate bookmarks…*
   (and the Bookmarks menu) lists every group of bookmarks at the same page, each bookmark with where it lives
   and Show in place / Edit… / Delete… (asked first). Two kinds: *same address* letter for letter, and *same

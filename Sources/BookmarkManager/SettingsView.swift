@@ -312,7 +312,7 @@ struct TransferPane: View {
     var body: some View {
         Form {
             Section("Export") {
-                Text("Everything in one .json file: the tabs, directories, sub-directories and bookmarks with their descriptions, addresses, tags and colors, the color codes, and the directory-levels setting. Easy to read and to keep as a backup.")
+                Text("Everything in one .json file: the tabs, directories, sub-directories and bookmarks with their descriptions, addresses, tags, notes and colors, the color codes, and the directory-levels setting. Easy to read and to keep as a backup.")
                     .font(DS.secondary).foregroundStyle(.secondary)
                 Toggle("Include the secrets", isOn: $includeSecrets)
                 Text(includeSecrets ? "The file will hold every secret decrypted, in plain text. Keep it somewhere safe and delete it when you are done with it." : "Secrets are left out. A bookmark that has one is still marked, so an import here keeps the secret it already has.")

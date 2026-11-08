@@ -1,5 +1,5 @@
-// The search box at the top of the window: every word typed must be found in a bookmark's name, address or
-// tags (or a directory's name), in any tab. Each hit says where it lives, so the window can show the path and
+// The search box at the top of the window: every word typed must be found in a bookmark's name, address, tags
+// or notes (or a directory's name), in any tab. Each hit says where it lives, so the window can show the path and
 // jump there.
 import Foundation
 
@@ -14,7 +14,7 @@ public struct SearchHit: Identifiable, Equatable, Sendable {
     public var path: FolderPath
     /// the names along `path`: the tab first
     public var names: [String]
-    /// what matched: "name", "address", "tag “x”"
+    /// what matched: "name", "address", "tag “x”", "notes"
     public var matched: [String]
 
     public var tabId: UUID { path.tabId }
@@ -61,7 +61,7 @@ extension Library {
 
     /// The fields that matched, or nil when some word matched nothing.
     static func match(_ words: [String], _ b: Bookmark) -> [String]? {
-        let name = fold(b.name), url = fold(b.url)
+        let name = fold(b.name), url = fold(b.url), notes = b.hasNotes ? fold(b.notes) : ""
         let tags = b.tags.map { ($0, fold($0)) }
         var fields: [String] = []
         for w in words {
@@ -73,6 +73,7 @@ extension Library {
                 let label = "tag “\(tag)”"
                 if !fields.contains(label) { fields.append(label) }
             }
+            if notes.contains(w) { found = true; if !fields.contains("notes") { fields.append("notes") } }
             if !found { return nil }
         }
         return fields

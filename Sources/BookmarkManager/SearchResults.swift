@@ -22,7 +22,7 @@ struct SearchResults: View {
                 VStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").font(.system(size: 32)).foregroundStyle(.secondary)
                     Text("Nothing matches").font(DS.heading)
-                    Text("The search looks at names, addresses and tags in every tab. Every word you type has to be found.").foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 400)
+                    Text("The search looks at names, addresses, tags and notes in every tab. Every word you type has to be found.").foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 400)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.bottom, 40)
             } else {
@@ -60,7 +60,7 @@ struct SearchResults: View {
         if b > 0 { parts.append("\(b) bookmark\(b == 1 ? "" : "s")") }
         if d > 0 { parts.append("\(d) director\(d == 1 ? "y" : "ies")") }
         if parts.isEmpty { return "nothing found" }
-        return parts.joined(separator: " and ") + ", in \(tabs) tab\(tabs == 1 ? "" : "s") · names, addresses and tags"
+        return parts.joined(separator: " and ") + ", in \(tabs) tab\(tabs == 1 ? "" : "s") · names, addresses, tags and notes"
     }
 }
 
@@ -99,6 +99,9 @@ struct HitRow: View {
             if case .bookmark(let b) = hit.kind, b.hasSecret {
                 Button { model.showSecret(b) } label: { Label(b.secretButtonTitle, systemImage: "key.fill").font(DS.secondary) }.buttonStyle(.bordered).controlSize(.small)
             }
+            if case .bookmark(let b) = hit.kind, b.hasNotes {
+                Button { model.showNotes(b) } label: { Label("Notes", systemImage: "doc.text").font(DS.secondary) }.buttonStyle(.bordered).controlSize(.small)
+            }
             Button("Show in place") { model.showInPlace(hit) }.buttonStyle(.bordered).controlSize(.small)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -114,6 +117,7 @@ struct HitRow: View {
                     Button("Open") { model.open(b) }
                     Button("Copy address") { model.copyAddress(b) }
                 }
+                if b.hasNotes { Button("Show notes") { model.showNotes(b) } }
                 Button("Edit…") { model.sheet = .editBookmark(b) }
             } else if case .folder(let f) = hit.kind {
                 Button("Open") { model.select(hit.path) ; model.query = "" }

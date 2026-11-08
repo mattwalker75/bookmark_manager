@@ -47,6 +47,7 @@ struct BookmarkManagerApp: App {
                 // the keyboard (Matt, Oct 29 2026); ↑ ↓ Return Space are handled in the window itself (KeyboardDriver)
                 Button("Copy Address") { model.copyFocusedAddress() }.keyboardShortcut("l").disabled(model.focusedBookmark.map(\.isSecretOnly) ?? true)
                 Button("Show Secret") { model.showFocusedSecret() }.disabled(!(model.focusedBookmark?.hasSecret ?? false))
+                Button("Show Notes") { model.showFocusedNotes() }.disabled(!(model.focusedBookmark?.hasNotes ?? false))
                 Button("Enclosing Directory") { model.goUp() }.keyboardShortcut(.upArrow, modifiers: .command).disabled(model.isSearching || model.selectedPath.isTabRoot)
             }
             CommandMenu("Tabs") {
@@ -86,6 +87,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Runs just before the app quits (the "when the app quits" backup); answers a sentence when it could not be written.
     static var beforeQuit: (() -> String?)?
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // notes being edited are saved or the quit is called off, before the quit-time backup looks at the library
+        guard NotesWindows.settleBeforeQuit() else { return .terminateCancel }
         guard let problem = AppDelegate.beforeQuit?() else { return .terminateNow }
         // the person decides (review 2: a failed quit-time backup used to vanish with the app)
         let a = NSAlert()

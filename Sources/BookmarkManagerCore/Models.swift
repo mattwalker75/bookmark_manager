@@ -54,13 +54,20 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
     /// meant to share its page with other bookmarks (Matt, Nov 8 2026: one bookmark per Gmail account, all at the
     /// same address) — the duplicates sheet leaves a group out once every member is marked
     public var skipDuplicateCheck: Bool
+    /// the bookmark has notes (Matt, Nov 8 2026): plain text for yourself — where you left off, how to find your
+    /// way around the site. NOT a secret: kept in library.json as it is, always exported, shown by the Notes button
+    public var hasNotes: Bool
+    public var notes: String
+    /// when the notes text last changed (stamped by the library on add / update), for the "Last edited" line
+    public var notesEditedAt: Date?
 
-    public init(id: UUID = UUID(), name: String, description: String = "", url: String, tags: [String] = [], colorId: UUID? = nil, hasSecret: Bool = false, secret: String = "", browser: String? = nil, skipLinkCheck: Bool = false, skipDuplicateCheck: Bool = false) {
+    public init(id: UUID = UUID(), name: String, description: String = "", url: String, tags: [String] = [], colorId: UUID? = nil, hasSecret: Bool = false, secret: String = "", browser: String? = nil, skipLinkCheck: Bool = false, skipDuplicateCheck: Bool = false, hasNotes: Bool = false, notes: String = "", notesEditedAt: Date? = nil) {
         self.id = id; self.name = name; self.description = description; self.url = url; self.tags = tags
         self.colorId = colorId; self.hasSecret = hasSecret; self.secret = secret; self.browser = browser; self.skipLinkCheck = skipLinkCheck; self.skipDuplicateCheck = skipDuplicateCheck
+        self.hasNotes = hasNotes; self.notes = notes; self.notesEditedAt = notesEditedAt
     }
 
-    enum CodingKeys: String, CodingKey { case id, name, description, url, tags, colorId, hasSecret, secret, browser, skipLinkCheck, skipDuplicateCheck }
+    enum CodingKeys: String, CodingKey { case id, name, description, url, tags, colorId, hasSecret, secret, browser, skipLinkCheck, skipDuplicateCheck, hasNotes, notes, notesEditedAt }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
@@ -74,6 +81,9 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
         browser = try c.decodeIfPresent(String.self, forKey: .browser).flatMap { $0.isEmpty ? nil : $0 }
         skipLinkCheck = (try? c.decodeIfPresent(Bool.self, forKey: .skipLinkCheck)) ?? false
         skipDuplicateCheck = (try? c.decodeIfPresent(Bool.self, forKey: .skipDuplicateCheck)) ?? false
+        hasNotes = (try? c.decodeIfPresent(Bool.self, forKey: .hasNotes)) ?? false
+        notes = (try? c.decodeIfPresent(String.self, forKey: .notes)) ?? ""
+        notesEditedAt = try? c.decodeIfPresent(Date.self, forKey: .notesEditedAt)
     }
 
     /// A secret-only item: no address at all (a passphrase for a phone, a Wi-Fi password). Its row shows a key
@@ -339,9 +349,10 @@ public struct Library: Codable, Equatable, Sendable {
 
     // MARK: bookmarks
 
-    /// Adds a bookmark to the folder at `path` (at the end, or before `before`).
-    public mutating func addBookmark(_ b: Bookmark, in path: FolderPath, before: UUID? = nil) throws {
-        let clean = try Library.cleaned(b)
+    /// Adds a bookmark to the folder at `path` (at the end, or before `before`). Notes typed get their date.
+    public mutating func addBookmark(_ b: Bookmark, in path: FolderPath, before: UUID? = nil, now: Date = Date()) throws {
+        var clean = try Library.cleaned(b)
+        if clean.hasNotes, !clean.notes.isEmpty, clean.notesEditedAt == nil { clean.notesEditedAt = now }
         guard folder(at: path) != nil else { throw BMError("The directory it was going into is gone.") }
         guard location(ofBookmark: b.id) == nil else { throw BMError("That bookmark is already in the library.") }
         modify(at: path) { f in
@@ -349,10 +360,11 @@ public struct Library: Codable, Equatable, Sendable {
         }
     }
 
-    /// Saves a changed bookmark where it is.
-    public mutating func updateBookmark(_ b: Bookmark) throws {
-        let clean = try Library.cleaned(b)
-        guard let p = location(ofBookmark: b.id) else { throw BMError("That bookmark is gone.") }
+    /// Saves a changed bookmark where it is. Notes whose text changed get the date (`now`) as their last edit.
+    public mutating func updateBookmark(_ b: Bookmark, now: Date = Date()) throws {
+        var clean = try Library.cleaned(b)
+        guard let p = location(ofBookmark: b.id), let old = folder(at: p)?.bookmarks.first(where: { $0.id == b.id }) else { throw BMError("That bookmark is gone.") }
+        if clean.hasNotes, clean.notes != old.notes { clean.notesEditedAt = now }
         modify(at: p) { f in if let i = f.bookmarks.firstIndex(where: { $0.id == b.id }) { f.bookmarks[i] = clean } }
     }
 
@@ -451,6 +463,7 @@ public struct Library: Codable, Equatable, Sendable {
             throw BMError("“\(c.url)” doesn't look like an address that can be opened. It should look like https://example.com/page.")
         }
         if !c.hasSecret { c.secret = "" }
+        if !c.hasNotes { c.notes = ""; c.notesEditedAt = nil }
         return c
     }
 

@@ -1,5 +1,5 @@
 // Export, validate and import: the whole library as one .json file — tabs, directories, sub-directories,
-// bookmarks, color codes and the directory-levels setting. Secrets go in only when asked (then the file holds
+// bookmarks (notes always included — they are not secrets), color codes and the directory-levels setting. Secrets go in only when asked (then the file holds
 // them in plain text — the window says so). Validate reads a file and lists every problem with where it is,
 // without changing anything; Import replaces the library or adds the file's tabs beside yours.
 import Foundation
@@ -159,6 +159,9 @@ public enum Transfer {
             } else if !b.secret.isEmpty {
                 r.problems.append(Problem(place: bw, text: "It has secret text but isn't marked as having a secret; the text is dropped when importing.", stops: false))
             }
+            if !b.hasNotes, !b.notes.isEmpty {
+                r.problems.append(Problem(place: bw, text: "It has notes but isn't marked as having notes; the notes are dropped when importing.", stops: false))
+            }
         }
         for sub in f.folders { check(sub, level: level + 1, place: here, lib: lib, colorIds: colorIds, ids: &ids, report: &r) }
     }
@@ -233,6 +236,7 @@ public enum Transfer {
         for i in f.bookmarks.indices {
             if let c = f.bookmarks[i].colorId, !colors.contains(c) { f.bookmarks[i].colorId = nil }
             if !f.bookmarks[i].hasSecret { f.bookmarks[i].secret = "" }
+            if !f.bookmarks[i].hasNotes { f.bookmarks[i].notes = ""; f.bookmarks[i].notesEditedAt = nil }
         }
         for i in f.folders.indices { tidy(&f.folders[i], colors) }
     }

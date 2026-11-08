@@ -10,8 +10,12 @@ struct TextBox: NSViewRepresentable {
     var minLines = 2
     var maxLines = 8
     var label: String?
+    /// false for prose (a bookmark's notes): the system font, spelling checked
+    var monospaced = true
 
     private static let font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+    private static let proseFont = NSFont.systemFont(ofSize: NSFont.systemFontSize + 1)
+    private var font: NSFont { monospaced ? Self.font : Self.proseFont }
     static func height(lines: Int) -> CGFloat { CGFloat(lines) * (font.ascender - font.descender + font.leading + 2) + 12 }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -21,7 +25,7 @@ struct TextBox: NSViewRepresentable {
         scroll.borderType = .bezelBorder
         let tv = scroll.documentView as! NSTextView
         tv.delegate = context.coordinator
-        tv.font = Self.font
+        tv.font = font
         tv.string = text
         tv.isRichText = false
         tv.allowsUndo = true
@@ -29,7 +33,7 @@ struct TextBox: NSViewRepresentable {
         tv.isAutomaticDashSubstitutionEnabled = false
         tv.isAutomaticTextReplacementEnabled = false
         tv.isAutomaticSpellingCorrectionEnabled = false
-        tv.isContinuousSpellCheckingEnabled = false
+        tv.isContinuousSpellCheckingEnabled = !monospaced
         tv.isGrammarCheckingEnabled = false
         tv.textContainerInset = NSSize(width: 4, height: 6)
         if let label { tv.setAccessibilityLabel(label) }
@@ -65,7 +69,7 @@ struct TextBox: NSViewRepresentable {
         func placeholder(_ tv: NSTextView, _ s: String) {
             if hint == nil, !s.isEmpty {
                 let l = NSTextField(labelWithString: s)
-                l.font = TextBox.font; l.textColor = .placeholderTextColor
+                l.font = parent.font; l.textColor = .placeholderTextColor
                 l.translatesAutoresizingMaskIntoConstraints = false
                 tv.addSubview(l)
                 NSLayoutConstraint.activate([l.leadingAnchor.constraint(equalTo: tv.leadingAnchor, constant: 9), l.topAnchor.constraint(equalTo: tv.topAnchor, constant: 6)])

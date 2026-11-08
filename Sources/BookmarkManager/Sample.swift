@@ -11,14 +11,16 @@ enum Sample {
             Bookmark(name: "Router status", url: "http://192.168.1.1/status"),
         ])
         let selfHosted = Folder(name: "Self-hosted apps", description: "The tools running on the Mac mini", folders: [admin], bookmarks: [
-            Bookmark(name: "People Manager", description: "A bookmark manager for people. Runs on the Mac mini.", url: "https://people.mini.ts.net", tags: ["people", "contacts"], colorId: work),
+            Bookmark(name: "People Manager", description: "A bookmark manager for people. Runs on the Mac mini.", url: "https://people.mini.ts.net", tags: ["people", "contacts"], colorId: work,
+                     hasNotes: true, notes: "Where I was (Nov 6):\n– Follow-ups built, the third review done.\n– Still to do: the business-card reader on the phone layout.\n– Ask about the MySQL backup before the next push.\n\nThe admin page is https://people.mini.ts.net/admin — the user switch is under the avatar, top right.", notesEditedAt: Date().addingTimeInterval(-2 * 86_400)),
             Bookmark(name: "My Business Manager", description: "LLC books, invoices and the Network card.", url: "http://mbm.mini.ts.net:3030", tags: ["llc", "invoices"], hasSecret: true, secret: "login: matt\npassword: example-only"),
             Bookmark(name: "App Router", description: "The launcher with the health lights.", url: "http://router.mini.ts.net", tags: ["launcher"]),
             Bookmark(name: "Junk Tracker", description: "Splurges and weight, phone first.", url: "https://junk.mini.ts.net", tags: ["health"], colorId: personal),
         ])
         let vendors = Folder(name: "Vendors", description: "Accounts we pay for", bookmarks: [
             Bookmark(name: "Webull", description: "Brokerage. Sandbox keys live in the Trading Desk.", url: "https://www.webull.com", tags: ["broker", "trading"], colorId: important, hasSecret: true, secret: "account: 0000-0000\npin: 0000"),
-            Bookmark(name: "Namecheap", description: "Domains and DNS.", url: "https://www.namecheap.com", tags: ["dns", "domains"], hasSecret: true, secret: "user: example\n2FA: authenticator app"),
+            Bookmark(name: "Namecheap", description: "Domains and DNS.", url: "https://www.namecheap.com", tags: ["dns", "domains"], hasSecret: true, secret: "user: example\n2FA: authenticator app",
+                     hasNotes: true, notes: "To change DNS: Domain List › Manage (not the domain name itself) › Advanced DNS tab. The host records are half-way down; Add New Record is at the bottom of that table.\nRenewals are under Account › Dashboard › Expiring Soon.", notesEditedAt: Date().addingTimeInterval(-30 * 86_400)),
             Bookmark(name: "AWS console", url: "https://console.aws.amazon.com", tags: ["cloud", "s3"], hasSecret: true, secret: "account alias: example\nIAM user: matt"),
         ])
         let reading = Folder(name: "Reading", bookmarks: [

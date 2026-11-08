@@ -299,6 +299,8 @@ final class AppModel: ObservableObject {
     }
     /// Space: the focused bookmark's secret, when it has one.
     func showFocusedSecret() { if let b = focusedBookmark, b.hasSecret { showSecret(b) } }
+    /// ⇧Space: the focused bookmark's notes, when it has some.
+    func showFocusedNotes() { if let b = focusedBookmark, b.hasNotes { showNotes(b) } }
     /// ⌘L: the focused bookmark's address (a secret-only one has none).
     func copyFocusedAddress() { if let b = focusedBookmark, !b.isSecretOnly { copyAddress(b) } }
     /// ⌘↑: the directory above, with the one just left under the arrow keys.
@@ -542,11 +544,39 @@ final class AppModel: ObservableObject {
         if change("The bookmark wasn't added", { try $0.addBookmark(b, in: path) }) { icons.warm(b.url) }
     }
     func updateBookmark(_ b: Bookmark) {
-        if change("The bookmark wasn't saved", { try $0.updateBookmark(b) }) { icons.warm(b.url); SecretWindows.refresh(b) }
+        if change("The bookmark wasn't saved", { try $0.updateBookmark(b) }) {
+            icons.warm(b.url); SecretWindows.refresh(b)
+            if let saved = library.bookmark(b.id) { NotesWindows.refresh(saved) }   // with the date the library stamped
+        }
     }
     func deleteBookmark(_ id: UUID) {
-        SecretWindows.close(id)
+        SecretWindows.close(id); NotesWindows.close(id)
         change { $0.deleteBookmark(id) }
+    }
+
+    // MARK: notes (Matt, Nov 8 2026): plain text for yourself, in a window of its own, never hidden by itself
+
+    func showNotes(_ b: Bookmark) { NotesWindows.show(b, model: self) }
+    /// Save from the notes window: the text as typed; the library stamps the date when it changed.
+    @discardableResult
+    func saveNotes(_ id: UUID, _ text: String) -> Bool {
+        guard var b = library.bookmark(id) else { notice = Notice(title: "The notes weren't saved", message: "That bookmark is gone."); return false }
+        b.hasNotes = true; b.notes = text
+        guard change("The notes weren't saved", { try $0.updateBookmark(b) }) else { return false }
+        if let saved = library.bookmark(id) { NotesWindows.refresh(saved) }
+        return true
+    }
+    /// Delete notes… (asked first, in the window): the bookmark stays, its notes are turned off — the row loses
+    /// its Notes button until the editor turns them on again (Matt).
+    func deleteNotes(_ id: UUID) {
+        guard var b = library.bookmark(id) else { return }
+        b.hasNotes = false; b.notes = ""
+        NotesWindows.close(id)
+        change("The notes weren't deleted") { try $0.updateBookmark(b) }
+    }
+    /// An address clicked inside the notes: the browser from Settings, like a bookmark.
+    func openLinkFromNotes(_ u: URL) {
+        Browsers.open(u, with: settings.browser) { [weak self] problem in self?.notice = Notice(title: "The address didn't open", message: problem) }
     }
 
     /// A drop (or Move to…). False = nothing changed (the reason was shown).
@@ -631,8 +661,8 @@ final class AppModel: ObservableObject {
         guard save() else { library = old; fixSelection(); return [] }
         // open secret windows: closed for bookmarks that are gone, brought up to date for the rest (a replace keeps ids)
         let stillThere = Set(lib.allBookmarks.map(\.id))
-        for id in old.allBookmarks.map(\.id) where !stillThere.contains(id) { SecretWindows.close(id) }
-        for b in lib.allBookmarks { SecretWindows.refresh(b) }
+        for id in old.allBookmarks.map(\.id) where !stillThere.contains(id) { SecretWindows.close(id); NotesWindows.close(id) }
+        for b in lib.allBookmarks { SecretWindows.refresh(b); NotesWindows.refresh(b) }
         if mode == .replace { selectTab(library.tabs[0].id) }
         // icons are fetched as rows come into view — not all at once here
         return notes

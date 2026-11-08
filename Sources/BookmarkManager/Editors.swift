@@ -23,6 +23,7 @@ struct BookmarkEditor: View {
     private let original: FolderPath
     @State private var problem: String?
     @State private var confirmDelete = false
+    @State private var confirmDeleteNotes = false
 
     init(bookmark: Bookmark?, path: FolderPath, secretOnly: Bool = false) {
         isNew = bookmark == nil
@@ -87,6 +88,17 @@ struct BookmarkEditor: View {
                             .font(DS.secondary).foregroundStyle(.secondary)
                     }
                 }
+                Section {
+                    // Matt, Nov 8 2026: notes are switched on and off like the secret; off with text asks first
+                    Toggle("This bookmark has notes", isOn: Binding(get: { bookmark.hasNotes }, set: { on in
+                        if !on, !bookmark.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { confirmDeleteNotes = true } else { bookmark.hasNotes = on }
+                    }))
+                    if bookmark.hasNotes {
+                        TextBox(text: $bookmark.notes, placeholder: "where you left off, how to find your way around the site — as many lines as you like", minLines: 3, maxLines: 6, label: "The notes", monospaced: false)
+                        Text("Plain notes for yourself. Not a secret: kept as they are, always in exports and backups, found by the search; the Notes button on the row opens them in a window of their own.")
+                            .font(DS.secondary).foregroundStyle(.secondary)
+                    }
+                }
             }
             .formStyle(.grouped)
             // the refusal sits above the buttons, where it is seen (review 2: at the end of the form it was below the fold)
@@ -99,11 +111,15 @@ struct BookmarkEditor: View {
             }
         }
         .padding(20)
-        .frame(width: 600, height: kind == .secretOnly ? 640 : (bookmark.hasSecret ? 700 : 580))
+        .frame(width: 600, height: min(730, (kind == .secretOnly ? 640 : (bookmark.hasSecret ? 700 : 580)) + (bookmark.hasNotes ? 120 : 0)))   // the form scrolls when it is all there
         .confirmationDialog("Delete the bookmark “\(bookmark.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete") { model.deleteBookmark(bookmark.id); dismiss() }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: { Text(bookmark.hasSecret ? "Its secret goes with it." : "This can't be undone.") }
+        .confirmationDialog("Delete the notes for “\(bookmark.name)”?", isPresented: $confirmDeleteNotes, titleVisibility: .visible) {
+            Button("Delete notes") { bookmark.hasNotes = false; bookmark.notes = "" }
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+        } message: { Text("The bookmark stays; only its notes are thrown away when you save. This can't be undone.") }
     }
 
     private func save() {
