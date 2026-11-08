@@ -8,6 +8,13 @@ Matt, Nov 8 2026: three more things for the daily use — notes on directories, 
 bookmarks in, and bigger or smaller text in the secret and notes windows.
 
 ### Added
+- 2026-11-08: **Import from a browser** (Matt) — Settings → Export & import → *Import from a browser…* reads
+  the HTML bookmarks file Safari, Chrome, Firefox, Edge or Brave export and brings it in as **one new tab**, its
+  folders as directories (and sub-directories), its links as bookmarks, in the browser's order. A sheet shows
+  what is coming (counts, where the file came from), lets you name the tab, and says what happens to the
+  directory levels: raised to fit the file's folders (up to 6), anything deeper folded into the directory above.
+  Bookmarklets and other non-addresses are left out and counted; so are empty folders. Firefox descriptions and
+  tags come along. Nothing already here changes, and nothing in the browser.
 - 2026-11-08: **Notes on directories** (Matt) — a directory or sub-directory can carry the same plain notes a
   bookmark can: tick *This directory has notes* in its editor. Its row (and its search result) gets the **Notes**
   button; right-click → Show notes; ⇧Space on the row. The same window — read-only until Edit, Save / Don't Save

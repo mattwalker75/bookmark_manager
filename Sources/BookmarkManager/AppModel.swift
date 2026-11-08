@@ -705,6 +705,19 @@ final class AppModel: ObservableObject {
         return notes
     }
 
+    /// Import from a browser's bookmarks file (Matt, Nov 8 2026): its folders and links come in as a new tab, which
+    /// is then shown. The sentences are for the Settings pane; a refusal is a notice.
+    func importBrowser(_ file: BrowserBookmarks.File, tabName: String) -> [String] {
+        let result: (library: Library, notes: [String], tabId: UUID)
+        do { result = try Transfer.importBrowser(file, tabName: tabName, into: library) }
+        catch { notice = Notice(title: "Nothing was imported", message: (error as? BMError)?.message ?? error.localizedDescription); return [] }
+        let old = library
+        library = result.library
+        guard save() else { library = old; fixSelection(); return [] }
+        selectTab(result.tabId)   // icons are fetched as rows come into view, like any import
+        return result.notes
+    }
+
     // MARK: development hooks (harmless when unset)
 
     /// BOOKMARKMANAGER_SAMPLE=1 with an empty BOOKMARKMANAGER_HOME fills in example bookmarks (for screenshots)

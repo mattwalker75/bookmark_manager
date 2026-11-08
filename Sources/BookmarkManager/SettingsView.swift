@@ -338,6 +338,7 @@ struct TransferPane: View {
     @State private var result: ValidationResult?
     @State private var pendingImport: ValidationResult?
     @State private var replacePending: ValidationResult?
+    @State private var browserResult: BrowserImportResult?
 
     var body: some View {
         Form {
@@ -357,10 +358,20 @@ struct TransferPane: View {
                     Button("Import…") { pick(thenImport: true) }
                 }
             }
+            Section("From a browser") {
+                Text("Bring a browser's bookmarks in as a new tab, its folders as directories. Export them from the browser first, as an HTML file — Safari: File → Export → Bookmarks…; Chrome: Bookmarks → Bookmark Manager → ⋮ → Export bookmarks; Firefox: Manage Bookmarks → Import and Backup → Export Bookmarks to HTML…. Nothing here is changed by it, and nothing in the browser.")
+                    .font(DS.secondary).foregroundStyle(.secondary)
+                Button("Import from a browser…") { pickBrowserFile() }
+            }
             if let message { Text(message).font(DS.secondary).foregroundStyle(messageIsProblem ? Theme.problem : .primary) }
         }
         .formStyle(.grouped)
         .sheet(item: $result) { r in ValidationSheet(result: r) { mode in finish(r, mode: mode) } }
+        .sheet(item: $browserResult) { r in
+            BrowserImportSheet(result: r) { notes in
+                message = "Imported \(r.url.lastPathComponent). " + notes.joined(separator: " "); messageIsProblem = false
+            }.environmentObject(model)
+        }
         .confirmationDialog("How should “\(pendingImport?.url.lastPathComponent ?? "")” come in?", isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } }), titleVisibility: .visible) {
             Button("Add its tabs beside mine") { if let p = pendingImport { finish(p, mode: .addTabs) }; pendingImport = nil }
             Button("Replace everything here…") { replacePending = pendingImport; pendingImport = nil }
@@ -398,6 +409,18 @@ struct TransferPane: View {
         let report = Transfer.validate(data)
         let r = ValidationResult(report: report, url: url, file: try? Transfer.read(data))
         if thenImport && report.canImport && report.notes.isEmpty { pendingImport = r } else { result = r }
+    }
+
+    /// Import from a browser…: the HTML file a browser exported, read and shown in its own sheet.
+    private func pickBrowserFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.html]; panel.allowsMultipleSelection = false
+        panel.message = "Choose the bookmarks file the browser exported (an .html file)."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let file = try BrowserBookmarks.parse(try Data(contentsOf: url))
+            browserResult = BrowserImportResult(url: url, file: file)
+        } catch { message = "\(url.lastPathComponent): " + ((error as? BMError)?.message ?? error.localizedDescription); messageIsProblem = true }
     }
 
     private func finish(_ r: ValidationResult, mode: ImportMode) {

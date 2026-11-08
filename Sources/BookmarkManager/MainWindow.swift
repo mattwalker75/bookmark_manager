@@ -55,7 +55,7 @@ struct MainWindow: View {
     }
 
     /// Development only, harmless when unset (for trying screens on a scratch BOOKMARKMANAGER_HOME):
-    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|notes[:<name prefix>]|notesedit:<name prefix>|edit:<name prefix>|editdir:<name prefix>|duplicates|search:<text>|textsize:<points>|settings[:tab[:end]]
+    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|notes[:<name prefix>]|notesedit:<name prefix>|edit:<name prefix>|editdir:<name prefix>|duplicates|search:<text>|textsize:<points>|browserimport:<path to an .html file>|settings[:tab[:end]]
     private func developmentHooks() {
         guard let hooks = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_AUTOSHEET"] else { return }
         // several steps separated by ";" run a second apart: "search:admin;keys:125,125,36"
@@ -107,6 +107,13 @@ struct MainWindow: View {
                 if sheet.hasPrefix("notesedit:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(10))) }) { model.showNotes(b); NotesWindows.holder(b.id)?.beginEdit() }
                 if sheet.hasPrefix("edit:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(5))) }) { model.sheet = .editBookmark(b) }
                 if sheet.hasPrefix("search:") { model.query = String(sheet.dropFirst(7)) }
+                if sheet.hasPrefix("browserimport:"), let data = try? Data(contentsOf: URL(fileURLWithPath: String(sheet.dropFirst(14)))), let file = try? BrowserBookmarks.parse(data) {
+                    // the browser-import sheet in a window of its own, over that file
+                    let w = NSWindow(contentRect: NSRect(x: 500, y: 300, width: 560, height: 440), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+                    w.title = "Import from a browser"; w.isReleasedWhenClosed = false
+                    w.contentView = NSHostingView(rootView: BrowserImportSheet(result: BrowserImportResult(url: URL(fileURLWithPath: String(sheet.dropFirst(14))), file: file)) { _ in }.environmentObject(model).preferredColorScheme(model.lookInForce.colorScheme).tint(Theme.accent).font(DS.body))
+                    w.makeKeyAndOrderFront(nil)
+                }
                 if sheet.hasPrefix("textsize:"), let n = Int(sheet.dropFirst(9)) { SecretWindows.setTextSizeEverywhere(n); NotesWindows.setTextSizeEverywhere(n) }   // every open secret / notes window
                 if sheet.hasPrefix("keys:"), let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" }) {
                     // key codes (125 ↓, 126 ↑, 36 Return, 49 Space) posted to the window like real key presses
