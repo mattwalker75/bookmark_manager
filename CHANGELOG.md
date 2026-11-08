@@ -26,6 +26,11 @@ Matt, Nov 8 2026: in daily use with zero issues, so this is 1.0 — with the thr
   switch in the editor (exported), and *Show the N left out* in the sheet brings such groups back with *Look at
   these again*. A new bookmark at a marked page shows the group again.
 
+### Fixed
+- 2026-11-08: The hide-after field in Settings → General came up **empty** (only a grey hint) even though the
+  setting was there — the Settings window gives that field the cursor as it opens, and the text field refused a
+  value while it had the cursor. It now shows the number straight away: 300 when nothing was ever set (Matt).
+
 ### Changed
 - 2026-11-08: **Hide a secret window after … seconds** (Matt: "5 seconds or 999 seconds") — Settings → General →
   Secrets is now a number of seconds typed or stepped (1 to 86,400), with "= 5 minutes" beside it and a "Never

@@ -150,7 +150,7 @@ struct HideAfterRow: View {
     var body: some View {
         LabeledContent("Hide a secret window after") {
             HStack(spacing: 8) {
-                PlainTextField("300", text: $text, monospaced: true, label: "Seconds before a secret window hides").frame(width: 76)
+                PlainTextField("", text: $text, monospaced: true, label: "Seconds before a secret window hides").frame(width: 76)
                     .disabled(never).opacity(never ? 0.5 : 1)
                 Stepper("", value: Binding(get: { model.settings.secretHideSeconds }, set: { set($0) }), in: AppSettings.hideSecondsRange).labelsHidden().disabled(never)
                 Text("seconds").foregroundStyle(never ? .secondary : .primary)

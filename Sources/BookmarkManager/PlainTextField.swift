@@ -37,15 +37,22 @@ struct PlainTextField: NSViewRepresentable {
     func updateNSView(_ f: NSTextField, context: Context) {
         context.coordinator.parent = self
         f.placeholderString = placeholder
-        // while the user types, the field is the truth; a change from elsewhere (Choose…, loading) is applied
-        if f.currentEditor() == nil, f.stringValue != text { f.stringValue = text }
+        // while the user types, the field is the truth; a change from elsewhere (Choose…, loading, a row filling
+        // itself in just after it appears) is applied. Nov 8 2026: "typing" is the coordinator's flag, not
+        // currentEditor() — a window gives its first field the cursor before anything is typed, and the old test
+        // left such a field empty (the hide-after seconds in Settings).
+        if !context.coordinator.editing, f.stringValue != text { f.stringValue = text }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var parent: PlainTextField
+        /// true from the first keystroke until the field is left
+        var editing = false
         init(_ p: PlainTextField) { parent = p }
+        func controlTextDidBeginEditing(_ n: Notification) { editing = true }
+        func controlTextDidEndEditing(_ n: Notification) { editing = false }
         func controlTextDidChange(_ n: Notification) {
             // SwiftUI may be mid-update; writing the binding on the next turn keeps the field's text intact
             guard let f = n.object as? NSTextField else { return }
