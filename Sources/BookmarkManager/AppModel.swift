@@ -58,7 +58,7 @@ final class AppModel: ObservableObject {
     @Published var settings = AppSettings.load() { didSet {
         guard settings != oldValue else { return }
         settings.save(); Theme.apply(settings); icons.enabled = settings.fetchIcons
-        if settings.secretHideMinutes != oldValue.secretHideMinutes { SecretWindows.rearmAll() }
+        if settings.secretHideSeconds != oldValue.secretHideSeconds { SecretWindows.rearmAll() }
     } }
     @Published var settingsTab = "general"
     /// the last link check's outcome (kept on disk), and the one running now
@@ -656,8 +656,11 @@ struct AppSettings: Codable, Equatable {
     var fetchIcons = true
     /// the directories whose sub-directories are shown in the folder tree (everything else is collapsed; remembered)
     var expanded: Set<UUID> = []
-    /// a secret window hides itself after this many minutes without being used; 0 = never (Matt, Oct 29 2026)
-    var secretHideMinutes = 5
+    /// a secret window hides itself after this many seconds without being used; 0 = never (Matt, Oct 29 2026 in
+    /// minutes; Nov 8 2026: any number of seconds, 5 or 999 — the old `secretHideMinutes` is carried over as ×60)
+    var secretHideSeconds = AppSettings.defaultHideSeconds
+    static let defaultHideSeconds = 300
+    static let hideSecondsRange = 1...86_400
     /// Touch ID (or the Mac's password) before a secret is shown
     var touchIDForSecrets = false
     /// check every address on its own every this many days; 0 = never (Matt, Oct 29 2026)
@@ -694,7 +697,8 @@ struct AppSettings: Codable, Equatable {
         browser = (readOptional(.browser) as String?).flatMap { $0.isEmpty ? nil : $0 }
         fetchIcons = read(.fetchIcons, true)
         expanded = read(.expanded, [])
-        secretHideMinutes = max(0, read(.secretHideMinutes, 5))
+        secretHideSeconds = AppSettings.hideSeconds(try? c.decodeIfPresent(Int.self, forKey: .secretHideSeconds),
+                                                    legacyMinutes: (try? d.container(keyedBy: LegacyKeys.self)).flatMap { try? $0.decodeIfPresent(Int.self, forKey: .secretHideMinutes) })
         touchIDForSecrets = read(.touchIDForSecrets, false)
         linkCheckDays = max(0, read(.linkCheckDays, 0))
         lastLinkCheckAt = readOptional(.lastLinkCheckAt)
@@ -707,6 +711,17 @@ struct AppSettings: Codable, Equatable {
         lastBackupDigest = readOptional(.lastBackupDigest)
         lastBackupAt = readOptional(.lastBackupAt)
     }
+
+    /// keys that are read but no longer written
+    private enum LegacyKeys: String, CodingKey { case secretHideMinutes }
+    /// `secretHideSeconds` when the file has it; else the old `secretHideMinutes` × 60; else the default. 0 stays
+    /// "never"; anything else is kept inside the range (a negative or absurd number means never / the top).
+    static func hideSeconds(_ seconds: Int?, legacyMinutes: Int?) -> Int {
+        if let s = seconds { return clampHide(s) }
+        if let m = legacyMinutes { return clampHide(m <= 0 ? 0 : m * 60) }
+        return defaultHideSeconds
+    }
+    static func clampHide(_ s: Int) -> Int { s <= 0 ? 0 : min(hideSecondsRange.upperBound, max(hideSecondsRange.lowerBound, s)) }
 
     static var url: URL { Home.folder().appendingPathComponent("settings.json") }
     static let encoder: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; e.outputFormatting = [.prettyPrinted, .sortedKeys]; return e }()

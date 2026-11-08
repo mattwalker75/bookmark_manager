@@ -69,7 +69,8 @@ it is not a developer: every message is a plain sentence.
    monospaced font plus the chrome, clamped to `floor` (420×180) and 60% × 70% of the screen; a changed secret
    refits only while the window is still the size it was given (a hand-resized one is left alone).
    **Hide-after and Touch ID** (Matt, Oct 29 2026): `SecretWindows.arm` closes a window after
-   `settings.secretHideMinutes` (0 = never) of not being key, re-armed on `windowDidBecomeKey`; `AppModel.showSecret`
+   `settings.secretHideSeconds` (Matt, Nov 8 2026: SECONDS, any number 1…86400, 0 = never; an old file's
+   `secretHideMinutes` is read as ×60; `HideAfterRow` in SettingsView is the field + stepper + Never switch) of not being key, re-armed on `windowDidBecomeKey`; `AppModel.showSecret`
    goes through `SecretGate` (LocalAuthentication `.deviceOwnerAuthentication`) when `touchIDForSecrets` is on —
    one pass covers 60 s, a cancel says nothing, a window already open is just brought forward. NO password
    generator (Matt: secrets are not only passwords).

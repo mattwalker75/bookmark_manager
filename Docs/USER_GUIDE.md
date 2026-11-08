@@ -67,8 +67,9 @@ hidden until you ask for it.
   the part you need — a word, a line — and copy it (⌘C, or double-click a word and right-click → Copy). There is
   no Copy button on purpose: a secret usually holds several things.
 - **Hide** closes the window. Closing it any other way does the same. **Edit bookmark…** opens the editor.
-- A secret window also **hides itself** after a while without being used — 5 minutes unless you change it in
-  Settings → General (1 to 30 minutes, or Never). Any click, key or scroll in the window counts as using it; a
+- A secret window also **hides itself** after a while without being used — 300 seconds (5 minutes) unless you
+  change it in Settings → General: any number of seconds from 1 to 86,400, 5 or 999 as you like, or the "Never
+  hide it by itself" switch. Any click, key or scroll in the window counts as using it; a
   window you are working in never closes under you, one you left behind does.
 - Settings → General can **ask for Touch ID** (or your Mac's password) before a secret is shown. One check covers
   the next minute, so opening several secrets in a row asks once. Turn it off there whenever you like.

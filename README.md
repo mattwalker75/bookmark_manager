@@ -18,7 +18,7 @@ tags, a color code and, when you need one, a **secret** on each bookmark.
   them; the row gets a light wash of the color.
 - A bookmark can also be a **secret only** — no address at all (a passphrase, the Wi-Fi password): same list, a key
   for an icon, a **Secrets-Only** button. A bookmark may name its own browser ("Opens in", in the editor).
-- **Secret windows** size themselves to their text, hide themselves after a few minutes (Settings), and can ask for
+- **Secret windows** size themselves to their text, hide themselves after a number of seconds you choose (Settings), and can ask for
   **Touch ID** first (Settings).
 - **Directories collapse** in the folder tree with chevrons, and remember what you left open.
 - **The keyboard**: ↑ ↓ walk the rows, Return opens, Space shows a secret, ⌘L copies the address, ⌘↑ goes up,

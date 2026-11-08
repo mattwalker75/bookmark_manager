@@ -41,7 +41,7 @@ Secret windows are plain `NSWindow`s kept in `SecretWindows` (one per bookmark i
 so an edit updates an open window and a delete closes it. `fittedSize` sizes a new window to its text (wrapped
 rows counted) between a floor and 60 % × 70 % of the screen; a changed secret refits a window still at that size.
 Each holder has a hide timer (`arm`) wound from the last click, key or scroll in the window (one event monitor
-for all secret windows); changing the minutes re-arms every open window. `SecretGate` asks Touch ID (or the Mac's
+for all secret windows); changing the seconds re-arms every open window. `SecretGate` asks Touch ID (or the Mac's
 password) before `showSecret` when Settings say so; one pass covers 60 s; one prompt at a time.
 
 Site icons: `IconCache.image(for:fetch:)` answers from memory or `<home>/icons/<host>.png`, else queues one fetch
@@ -74,7 +74,7 @@ refuses to go on without it; it goes through `importFile(.replace)` so the secre
 `library.json` (`{"app":"Bookmark Manager","library":{…}}`, secrets blank) · `secrets.enc` (AES-GCM,
 `{bookmarkId: text}`) · `secret.key` (32 random bytes, 0600) · `settings.json` (appearance, accent, themes,
 activeThemeId, browser bundle id, fetchIcons, `expanded` = the directory ids whose branch is open in the tree,
-`secretHideMinutes` (0 = never), `touchIDForSecrets`, `linkCheckDays` 0/7/30) · `linkcheck.json` (the last link check: `checkedAt`, `checked`, `problems` with the address each had, `scope`, `automatic`, `bannerDismissed`, `seconds`) · `Backups/` (or the folder in
+`secretHideSeconds` (0 = never; an old file's `secretHideMinutes` is read as ×60), `touchIDForSecrets`, `linkCheckDays` 0/7/30) · `linkcheck.json` (the last link check: `checkedAt`, `checked`, `problems` with the address each had, `scope`, `automatic`, `bannerDismissed`, `seconds`) · `Backups/` (or the folder in
 settings `backupFolder`): `Bookmark Manager <date>.bmbackup` = JSON `BackupFile` {app, kind:"backup", version 1, createdAt,
 reason, kept, note, counts, library (secrets blank), secrets (AES-GCM of {id: text} with secret.key, base64),
 passphrase {wrapped, salt, rounds} = secret.key sealed with PBKDF2-HMAC-SHA256(passphrase)}. Settings also keep

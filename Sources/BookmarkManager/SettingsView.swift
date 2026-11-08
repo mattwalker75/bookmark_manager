@@ -57,11 +57,8 @@ struct GeneralPane: View {
                     .font(DS.secondary).foregroundStyle(depthProblem == nil ? Color.secondary : Theme.problem)
             }
             Section("Secrets") {
-                Picker("Hide a secret window after", selection: $model.settings.secretHideMinutes) {
-                    ForEach([1, 2, 5, 10, 30], id: \.self) { m in Text("\(m) minute\(m == 1 ? "" : "s")").tag(m) }
-                    Text("Never").tag(0)
-                }
-                Text("An open secret window closes by itself after this long without being used. Clicking into it starts the clock again.")
+                HideAfterRow()
+                Text("An open secret window closes by itself after this many seconds without being used — any number from \(AppSettings.hideSecondsRange.lowerBound) to \(AppSettings.hideSecondsRange.upperBound) (a day). Clicking into it starts the clock again. Notes windows never hide by themselves.")
                     .font(DS.secondary).foregroundStyle(.secondary)
                 Toggle("Ask for Touch ID before showing a secret", isOn: $model.settings.touchIDForSecrets)
                     .onChange(of: model.settings.touchIDForSecrets) { _, on in if !on { SecretGate.forget() } }
@@ -116,6 +113,71 @@ struct GeneralPane: View {
         case 2: return "2 — directories with sub-directories"
         default: return "\(d) levels"
         }
+    }
+}
+
+/// "Hide a secret window after [300] seconds (= 5 minutes)" and the Never switch (Matt, Nov 8 2026: seconds, any
+/// number — 5 or 999). The field keeps what is typed until it is a number; a number out of range is pulled back in.
+struct HideAfterRow: View {
+    @EnvironmentObject var model: AppModel
+    @State private var text = ""
+    /// the seconds the field last showed, so a change from elsewhere (another pane, the file) is noticed
+    @State private var shown = -1
+
+    private var never: Bool { model.settings.secretHideSeconds == 0 }
+    /// the seconds remembered while Never is on, so turning it off brings the old number back
+    @AppStorage("secretHideSecondsBeforeNever") private var beforeNever = AppSettings.defaultHideSeconds
+
+    var body: some View {
+        LabeledContent("Hide a secret window after") {
+            HStack(spacing: 8) {
+                PlainTextField("300", text: $text, monospaced: true, label: "Seconds before a secret window hides").frame(width: 76)
+                    .disabled(never).opacity(never ? 0.5 : 1)
+                Stepper("", value: Binding(get: { model.settings.secretHideSeconds }, set: { set($0) }), in: AppSettings.hideSecondsRange).labelsHidden().disabled(never)
+                Text("seconds").foregroundStyle(never ? .secondary : .primary)
+                Text(HideAfterRow.asMinutes(model.settings.secretHideSeconds)).font(DS.secondary).foregroundStyle(.secondary).frame(minWidth: 90, alignment: .leading)
+            }
+        }
+        .onAppear { sync() }
+        .onChange(of: model.settings.secretHideSeconds) { _, _ in sync() }
+        .onChange(of: text) { _, t in
+            // typed: a whole number inside the range is taken at once; anything else waits until the field is left
+            let digits = t.trimmingCharacters(in: .whitespaces)
+            if let n = Int(digits), AppSettings.hideSecondsRange.contains(n), n != model.settings.secretHideSeconds { shown = n; model.settings.secretHideSeconds = n }
+        }
+        .onDisappear { commit() }
+        .onSubmit { commit() }
+        Toggle("Never hide it by itself", isOn: Binding(get: { never }, set: { on in
+            if on { if model.settings.secretHideSeconds > 0 { beforeNever = model.settings.secretHideSeconds }; set(0) }
+            else { set(beforeNever > 0 ? beforeNever : AppSettings.defaultHideSeconds) }
+        }))
+    }
+
+    private func set(_ n: Int) { model.settings.secretHideSeconds = AppSettings.clampHide(n) }
+    /// the field follows the setting (but a blank or half-typed field is left alone while it has the cursor)
+    private func sync() {
+        let n = model.settings.secretHideSeconds
+        guard n != shown else { return }
+        shown = n
+        text = n == 0 ? "\(beforeNever > 0 ? beforeNever : AppSettings.defaultHideSeconds)" : "\(n)"
+    }
+    /// the field is left: a number out of range is pulled back in, anything that isn't a number goes back to the setting
+    private func commit() {
+        guard !never else { return }
+        if let n = Int(text.trimmingCharacters(in: .whitespaces)) { set(n) } else { shown = -1 }
+        sync()
+    }
+
+    /// "= 5 minutes", "= 1 hour 30 minutes", nothing under a minute, "never" for 0
+    static func asMinutes(_ s: Int) -> String {
+        guard s > 0 else { return "never" }
+        guard s >= 60 else { return "" }
+        let h = s / 3600, m = (s % 3600) / 60, sec = s % 60
+        var parts: [String] = []
+        if h > 0 { parts.append("\(h) hour\(h == 1 ? "" : "s")") }
+        if m > 0 { parts.append("\(m) minute\(m == 1 ? "" : "s")") }
+        if sec > 0 { parts.append("\(sec) s") }
+        return "= " + parts.joined(separator: " ")
     }
 }
 

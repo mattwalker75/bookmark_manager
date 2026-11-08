@@ -56,7 +56,7 @@ final class Review2Tests: XCTestCase {
         XCTAssertEqual(s.backupWhen, .dailyAndQuit); XCTAssertNil(s.backupPassphrase); XCTAssertNil(s.lastBackupAt)
         XCTAssertTrue(s.backupsEnabled); XCTAssertFalse(s.backupSecretsPlain, "a wrong type for one value never throws the whole file away")
         let older = try d.decode(AppSettings.self, from: Data(#"{"appearance":"dark","fetchIcons":"maybe","browser":"","secretHideMinutes":"ten"}"#.utf8))
-        XCTAssertEqual(older.appearance, .dark); XCTAssertTrue(older.fetchIcons); XCTAssertNil(older.browser); XCTAssertEqual(older.secretHideMinutes, 5)
+        XCTAssertEqual(older.appearance, .dark); XCTAssertTrue(older.fetchIcons); XCTAssertNil(older.browser); XCTAssertEqual(older.secretHideSeconds, 300, "an unreadable old minutes value falls back to the default")
         // prune never takes every unkept backup, even when told to keep none
         let bs = BackupStore(folder: home.appendingPathComponent("B"))
         let lib = Sample.library()

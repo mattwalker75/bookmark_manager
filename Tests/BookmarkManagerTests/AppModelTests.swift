@@ -401,13 +401,36 @@ final class KeyboardTests: XCTestCase {
 /// Secret windows that hide themselves, and Touch ID before a secret (Matt, Oct 29 2026).
 @MainActor
 final class SecretGuardTests: XCTestCase {
+    /// Nov 8 2026: the setting became seconds. An old file's minutes carry over, the new key wins when both are
+    /// there, and the number stays inside 1…86400 (0 = never).
+    func testHideAfterIsSecondsAndOldMinutesCarryOver() throws {
+        let d = JSONDecoder()
+        let minutes = try d.decode(AppSettings.self, from: Data(#"{"secretHideMinutes":10}"#.utf8))
+        XCTAssertEqual(minutes.secretHideSeconds, 600, "10 minutes → 600 seconds")
+        let never = try d.decode(AppSettings.self, from: Data(#"{"secretHideMinutes":0}"#.utf8))
+        XCTAssertEqual(never.secretHideSeconds, 0, "never stays never")
+        let both = try d.decode(AppSettings.self, from: Data(#"{"secretHideMinutes":10,"secretHideSeconds":5}"#.utf8))
+        XCTAssertEqual(both.secretHideSeconds, 5, "the new key wins")
+        let huge = try d.decode(AppSettings.self, from: Data(#"{"secretHideSeconds":999999}"#.utf8))
+        XCTAssertEqual(huge.secretHideSeconds, 86_400, "pulled back to a day")
+        let text = try d.decode(AppSettings.self, from: Data(#"{"secretHideSeconds":"soon"}"#.utf8))
+        XCTAssertEqual(text.secretHideSeconds, 300, "nonsense → the default")
+        // what is written back is the new key only
+        var s = AppSettings(); s.secretHideSeconds = 999
+        let json = String(decoding: try AppSettings.encoder.encode(s), as: UTF8.self)
+        XCTAssertTrue(json.contains("\"secretHideSeconds\" : 999")); XCTAssertFalse(json.contains("secretHideMinutes"))
+        XCTAssertEqual(AppSettings.clampHide(-4), 0); XCTAssertEqual(AppSettings.clampHide(0), 0); XCTAssertEqual(AppSettings.clampHide(1), 1); XCTAssertEqual(AppSettings.clampHide(5), 5)
+        XCTAssertEqual(HideAfterRow.asMinutes(300), "= 5 minutes"); XCTAssertEqual(HideAfterRow.asMinutes(5), ""); XCTAssertEqual(HideAfterRow.asMinutes(0), "never")
+        XCTAssertEqual(HideAfterRow.asMinutes(5400), "= 1 hour 30 minutes"); XCTAssertEqual(HideAfterRow.asMinutes(61), "= 1 minute 1 s"); XCTAssertEqual(HideAfterRow.asMinutes(86_400), "= 24 hours")
+    }
+
     func testSettingsHaveSafeDefaultsAndReadOldFiles() throws {
         let fresh = AppSettings()
-        XCTAssertEqual(fresh.secretHideMinutes, 5); XCTAssertFalse(fresh.touchIDForSecrets)
+        XCTAssertEqual(fresh.secretHideSeconds, 300); XCTAssertFalse(fresh.touchIDForSecrets)
         let old = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"appearance":"dark"}"#.utf8))
-        XCTAssertEqual(old.secretHideMinutes, 5); XCTAssertFalse(old.touchIDForSecrets)
+        XCTAssertEqual(old.secretHideSeconds, 300); XCTAssertFalse(old.touchIDForSecrets)
         let odd = try JSONDecoder().decode(AppSettings.self, from: Data(#"{"secretHideMinutes":-3,"touchIDForSecrets":true}"#.utf8))
-        XCTAssertEqual(odd.secretHideMinutes, 0, "a negative number means never, not a crash"); XCTAssertTrue(odd.touchIDForSecrets)
+        XCTAssertEqual(odd.secretHideSeconds, 0, "a negative number means never, not a crash"); XCTAssertTrue(odd.touchIDForSecrets)
     }
 
     func testOnePassedCheckCoversAMinute() {

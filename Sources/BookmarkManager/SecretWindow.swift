@@ -43,15 +43,15 @@ enum SecretWindows {
 
     static func isOpen(_ id: UUID) -> Bool { windows[id] != nil }
 
-    /// The window hides itself after Settings' minutes without being used (0 = never). "Used" is a click, a key or a
+    /// The window hides itself after Settings' seconds without being used (0 = never). "Used" is a click, a key or a
     /// scroll in it (one event monitor for all secret windows); when the clock runs out on a window used since, it
     /// is wound again for the time left.
     static func arm(_ id: UUID) {
         guard let holder = holders[id] else { return }
         holder.timer?.invalidate(); holder.timer = nil
-        let minutes = holder.model?.settings.secretHideMinutes ?? 0
-        guard minutes > 0 else { return }
-        let interval = TimeInterval(minutes) * 60
+        let seconds = holder.model?.settings.secretHideSeconds ?? 0
+        guard seconds > 0 else { return }
+        let interval = TimeInterval(seconds)
         let wait = max(1, interval - Date().timeIntervalSince(holder.lastUsed))
         holder.timer = Timer.scheduledTimer(withTimeInterval: wait, repeats: false) { _ in
             MainActor.assumeIsolated {
@@ -60,7 +60,7 @@ enum SecretWindows {
             }
         }
     }
-    /// Settings changed: every open window follows the new minutes (or stops counting at Never).
+    /// Settings changed: every open window follows the new seconds (or stops counting at Never).
     static func rearmAll() { for id in windows.keys { arm(id) } }
 
     private static var activityMonitor: Any?
@@ -139,7 +139,7 @@ final class SecretHolder: ObservableObject {
     @Published var bookmark: Bookmark
     /// the size the window was given to fit its text (a window still this size follows the text when it changes)
     var fitted = NSSize.zero
-    /// hides the window after Settings' minutes
+    /// hides the window after Settings' seconds
     var timer: Timer?
     /// the last click, key or scroll in the window (or when it came forward)
     var lastUsed = Date()

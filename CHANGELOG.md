@@ -2,6 +2,14 @@
 
 All notable changes to Bookmark Manager (Keep a Changelog style; dates are when the change was made).
 
+## [Unreleased]
+
+### Changed
+- 2026-11-08: **Hide a secret window after … seconds** (Matt: "5 seconds or 999 seconds") — Settings → General →
+  Secrets is now a number of seconds typed or stepped (1 to 86,400), with "= 5 minutes" beside it and a "Never
+  hide it by itself" switch, instead of the fixed list of minutes. A setting from before carries over (5 minutes →
+  300 seconds). Open secret windows follow a change at once.
+
 ## [0.5.0] — 2026-10-30
 
 ### Added
