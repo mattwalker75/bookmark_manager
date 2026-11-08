@@ -26,7 +26,8 @@ hidden until you ask for it.
   allow one deeper. Give it a name, an optional description, a color.
 - Directories may go **two levels deep** by default (a directory with a sub-directory in it). Settings → General
   changes that (1 to 6). It can't be lowered while a deeper directory exists.
-- **Edit…** (the button on its page, or right-click) changes the name, description and color.
+- **Edit…** (the button on its page, or right-click) changes the name, description and color — and can give the
+  directory **notes** (see Notes): tick *This directory has notes*. Its row then shows a **Notes** button.
 - A directory can only be deleted when it is **empty**. If it still holds something, the app says what, and nothing
   happens — move or delete what is inside first. That is on purpose, so a full directory never goes by accident.
 
@@ -75,6 +76,10 @@ hidden until you ask for it.
   window you are working in never closes under you, one you left behind does.
 - Settings → General can **ask for Touch ID** (or your Mac's password) before a secret is shown. One check covers
   the next minute, so opening several secrets in a row asks once. Turn it off there whenever you like.
+- **Bigger or smaller text**: ⌘+ and ⌘− (or ⌘=) change the text size in the window in front of you, ⌘0 puts it
+  back; the window grows or shrinks to fit (unless you resized it by hand). The size a secret window *opens*
+  with is in Settings → General → Secrets → *Text size in a secret window* (9 to 36 points, 14 to begin with).
+  The View menu has the same three items.
 - Secrets never go into the bookmarks file, and go into an export only when you tick the box (see Export).
 
 ## Notes
@@ -82,6 +87,9 @@ hidden until you ask for it.
   still need the phone crop"), or how to find your way around a site that hides things ("Billing is under
   Account › Billing › Invoices, not Payments"). Notes are **not secrets**: they are kept as they are in the
   bookmarks file, go into every export and backup, and the search finds them.
+- **A directory can carry notes too** — a project's status, what lives where. Tick *This directory has notes* in
+  its editor; its row (on the directory's page, and in search results) gets the same **Notes** button, and the
+  window has **Show directory** in place of Open bookmark. Everything below applies to both.
 - Tick **This bookmark has notes** in the editor and type as many lines as you like (or nothing yet). The row then
   shows a **Notes** button beside the Secret one; a secret-only item can have notes too.
 - Click **Notes** (or press ⇧Space on the row, or right-click → Show notes) and the notes open in a window of
@@ -94,6 +102,8 @@ hidden until you ask for it.
   button goes. To have notes again, tick the switch in the editor and type them. Turning the switch off in the
   editor asks the same question.
 - **Open bookmark** in the window opens the site, so instructions and the site sit side by side.
+- **Bigger or smaller text**: ⌘+ and ⌘− (or ⌘=) in the window, ⌘0 puts it back. The size a notes window opens
+  with is in Settings → General → Notes → *Text size in a notes window*.
 
 ## Arranging
 - Bookmarks and directories stay in the order you put them. **Sort by name** on a directory's page sorts that
@@ -106,7 +116,7 @@ hidden until you ask for it.
 
 ## Search
 - The box in the title bar (⌘F) searches as you type: every word must be found in a bookmark's **name, address,
-  tags or notes**, or in a **directory's name**, in **every tab**. Descriptions are not searched.
+  tags or notes**, or in a **directory's name or notes**, in **every tab**. Descriptions are not searched.
 - Results are grouped by tab. Each shows where it lives (*Work › Self-hosted apps › Admin pages*), what matched,
   and the Secret and Notes buttons. Click a name to open it; **Show in place** switches to its tab, opens its directory and
   marks the row for a moment. **Clear** (or Esc in the box) goes back.
@@ -114,8 +124,9 @@ hidden until you ask for it.
 ## The keyboard
 - **↑ ↓** walk the rows of the open directory (sub-directories first, then bookmarks); the row under the keys
   gets the accent outline. **Return** opens it: a bookmark in your browser, a secret-only item's secret, a
-  sub-directory on the page. **Space** shows the row's secret, **⇧Space** its notes. **⌘L** copies its address. **⌘↑** goes up to the
+  sub-directory on the page. **Space** shows the row's secret, **⇧Space** its notes (a sub-directory's too). **⌘L** copies its address. **⌘↑** goes up to the
   enclosing directory, with the one you left under the keys.
+- In a secret or notes window: **⌘+** bigger text, **⌘−** smaller, **⌘0** back to the size from Settings.
 - While the cursor is in the search box, ↑ ↓ walk the results and Return opens the one under the keys; every
   other key keeps typing.
 - **⌘1 … ⌘9** switch to that tab (the Tabs menu lists them); **⌃Tab** and **⌃⇧Tab** go to the next and previous tab.
@@ -164,8 +175,9 @@ hidden until you ask for it.
 
 ## Settings
 - **General** — *Open bookmarks in*: the Mac's default browser (whatever app that is), or any browser installed
-  on this Mac. *Directory levels inside a tab*. **Secrets**: how long a secret window stays, and Touch ID before a
-  secret. **Links**: Check every address…, Last results…, and the schedule. *Fetch site icons* (off = no network
+  on this Mac. *Directory levels inside a tab*. **Secrets**: how long a secret window stays, the text size it opens
+  with, and Touch ID before a secret. **Notes**: the text size a notes window opens with. **Links**: Check every
+  address…, Last results…, the schedule, Find duplicate bookmarks…, and *Fetch site icons* (off = no network
   for icons; icons already fetched still show). Where the files are kept, with Show in Finder.
 - **Color codes** — above.
 - **Appearance** — Light / Dark / Follow the system, the accent color, and themes of your own.
@@ -185,6 +197,16 @@ hidden until you ask for it.
   - **Add its tabs beside mine** — the file's tabs are added as copies; yours stay as they are.
   - **Replace everything here** — what is here is thrown away first (it asks again). If the file was exported
     without secrets, bookmarks that are already here keep the secrets they have.
+- **Import from a browser…** brings a browser's bookmarks in as **one new tab**, its folders as directories and
+  sub-directories, its links as bookmarks, in the browser's order. Export them from the browser first, as an
+  HTML file: Safari → File → Export → Bookmarks…; Chrome → Bookmarks → Bookmark Manager → ⋮ → Export bookmarks;
+  Firefox → Bookmarks → Manage Bookmarks → Import and Backup → Export Bookmarks to HTML… (Edge and Brave much the
+  same). A sheet shows what is coming — how many directories and bookmarks, which browser it looks like — and
+  lets you name the tab. If the file's folders go deeper than your directory levels, the levels are raised to
+  fit (up to 6); anything deeper still is folded into the directory above it, so no bookmark is lost.
+  Bookmarklets and other things that aren't web addresses are left out and counted; so are empty folders.
+  Nothing already here changes, and nothing in the browser. Run *Find duplicate bookmarks…* afterwards if you
+  think some of them were here already.
 
 ## Backups
 - Settings → **Backups**. **Enable backups** is on from the start: a backup is one file (`Bookmark Manager

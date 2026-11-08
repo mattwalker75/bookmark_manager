@@ -13,20 +13,22 @@ it is not a developer: every message is a plain sentence.
 ## Map
 - `Sources/BookmarkManagerCore/` — no UI, tested on its own.
   - `Models.swift` — Library (maxDepth, colors, tabs) → Folder (a tab, directory or sub-directory: name, description,
-    colorId, folders, bookmarks) → Bookmark (name, description, url, tags, colorId, hasSecret, secret, hasNotes,
+    colorId, folders, bookmarks, hasNotes, notes, notesEditedAt) → Bookmark (name, description, url, tags, colorId, hasSecret, secret, hasNotes,
     notes, notesEditedAt, browser, skipLinkCheck, skipDuplicateCheck). FolderPath
     (`[tabId, folderId…]`). Every rule that refuses something throws `BMError` with the sentence the window shows.
   - `Arrange.swift` — `Library.move(DragItem, to:before:)`: the ONE function for drag/drop and Move to…
-  - `Search.swift` — `Library.search` (names, addresses, tags; directory names) → `SearchHit` with its path.
+  - `Search.swift` — `Library.search` (names, addresses, tags, notes; directory names and notes) → `SearchHit` with its path.
   - `Store.swift` (library.json, Home, `BOOKMARKMANAGER_HOME`), `SecretBox.swift` (AES-GCM secrets.enc + secret.key),
     `Transfer.swift` (export / `validate` / `apply` import), `Favicons.swift` (where a site's icon is; no network),
     `Backup.swift` (BackupFile, PassphraseWrap, Backup.make/read/check, BackupStore), `Duplicates.swift`
-    (duplicateKey, findDuplicates → DuplicateReport, setKeptAsDuplicates).
+    (duplicateKey, findDuplicates → DuplicateReport, setKeptAsDuplicates), `BrowserBookmarks.swift` (parse a
+    browser's bookmarks HTML → File, makeTab, `Transfer.importBrowser`).
 - `Sources/BookmarkManager/` — the app. `AppModel` drives the core (every change goes through `change { }`, which
   turns a refusal into a `Notice` and saves on success). `MainWindow` (SearchBar, TabBar, FolderTree, FolderDetail,
   BookmarkRow, SubfolderRow, drag/drop helpers), `SearchResults`, `Editors` (BookmarkEditor, FolderEditor,
   TabNameSheet, MoveSheet, ColorPills, DestinationPicker, BrowserPicker), `SecretWindow` (one NSWindow per bookmark,
-  self-sizing, hide timer), `NotesWindow` (the notes window: read first, Edit, Save/Cancel, the two questions),
+  self-sizing, hide timer), `NotesWindow` (the notes window for a bookmark OR a directory — `NotesItem`: read first, Edit, Save/Cancel, the two questions),
+  `TextSize` (⌘+ ⌘− ⌘0 in secret / notes windows), `BrowserImportView` (the import-from-a-browser sheet),
   `SecretGate` (Touch ID), `LinkCheck` + `LinkCheckView` (the link check and its sheet /
   banner), `DuplicatesView` (the duplicates sheet), `SettingsView` (General, Color codes, Appearance, Backups, Export & import + ValidationSheet),
   `BackupsView` (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet), `Browsers`, `Icons` (IconCache +
@@ -77,7 +79,10 @@ it is not a developer: every message is a plain sentence.
    `secretHideMinutes` is read as ×60; `HideAfterRow` in SettingsView is the field + stepper + Never switch) of not being key, re-armed on `windowDidBecomeKey`; `AppModel.showSecret`
    goes through `SecretGate` (LocalAuthentication `.deviceOwnerAuthentication`) when `touchIDForSecrets` is on —
    one pass covers 60 s, a cancel says nothing, a window already open is just brought forward. NO password
-   generator (Matt: secrets are not only passwords).
+   generator (Matt: secrets are not only passwords). **Text size** (Matt, Nov 8 2026): `settings.secretTextSize` /
+   `notesTextSize` (9…36 pt, default 14; `TextSizeRow` in Settings) is the size a window OPENS with; ⌘+ ⌘= ⌘− ⌘0
+   (`TextSizeKeys`, one local monitor; View menu items enabled while `textWindowIsKey`) change THAT window by
+   2 pt a step and refit it while it is still the fitted size — never the setting itself.
 6a. **Secret-only items** (Matt, Oct 29 2026; mockup canvas UG7WKF8nLnByzTDEKbpewk — row A, editor B): a bookmark
     may have NO address when it has a secret (`Bookmark.isSecretOnly` = blank url; `cleaned` refuses blank url +
     no secret). It stays in the same list as every other bookmark (manual order, colors, drag, search by name/tags).
@@ -99,6 +104,18 @@ it is not a developer: every message is a plain sentence.
     `hasNotes` OFF — the button goes until the editor turns it on again (Matt). The library stamps
     `notesEditedAt` on add/update when the text changed ("Last edited …"). ⇧Space / Show Notes menu item.
     Prose: system font, spelling checked, no smart quotes (notes hold commands). `TextBox(monospaced: false)`.
+    **Directories have notes too** (Matt, Nov 8 2026): `Folder.hasNotes/notes/notesEditedAt`, the same rules
+    through `addFolder(hasNotes:notes:)` / `updateFolder(hasNotes:notes:)` (nil = untouched); the switch in
+    FolderEditor; the Notes button on SubfolderRow and the folder HitRow (NOT in the tree, which stays lean);
+    Show notes in the row menus; ⇧Space / Show Notes via `focusedFolder`; searched (`matchFolder`); the window
+    shows **Show directory** (`revealFolder`) in place of Open bookmark. Tabs carry the fields but no UI.
+7a. **Import from a browser** (Matt, Nov 8 2026): `BrowserBookmarks.parse` reads the NETSCAPE-Bookmark-file HTML
+    (Safari / Chrome / Firefox / Edge / Brave all export it) tolerantly; the file becomes ONE new tab
+    (`Transfer.importBrowser`; the tab's name is typed in `BrowserImportSheet`, suggested from the browser guess),
+    folders → directories in the browser's order, links → bookmarks (Firefox DD descriptions and TAGS kept).
+    `maxDepth` is RAISED to fit (up to 6) with a sentence; deeper folders fold into the directory above; bookmarklets /
+    `place:` links and empty folders are left out and counted. Never merges into existing tabs, never dedups
+    (Find duplicates is for that), never writes to the browser. No export in that format (not asked for).
 7. **Export** is one JSON (`ExportFile`: tabs, directories, bookmarks, colors, maxDepth). "Include the secrets" is a
    checkbox that **defaults OFF**; on, the file holds them decrypted and the pane says so. **Validate** lists every
    problem with its place (`Transfer.validate`, stops vs notes) and changes nothing; Import validates first, then

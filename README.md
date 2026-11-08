@@ -18,11 +18,12 @@ tags, a color code and, when you need one, a **secret** on each bookmark.
   them; the row gets a light wash of the color.
 - A bookmark can also be a **secret only** — no address at all (a passphrase, the Wi-Fi password): same list, a key
   for an icon, a **Secrets-Only** button. A bookmark may name its own browser ("Opens in", in the editor).
-- **Notes** on any bookmark: plain text for yourself (where you left off, how to get around a site) in a window
+- **Notes** on any bookmark — and on any directory: plain text for yourself (where you left off, how to get around a site) in a window
   of its own that stays open as long as you like — read-only until you click Edit, Save or Don't Save on close.
   Not secrets: in every export and backup, found by the search.
 - **Secret windows** size themselves to their text, hide themselves after a number of seconds you choose (Settings), and can ask for
-  **Touch ID** first (Settings).
+  **Touch ID** first (Settings). ⌘+ ⌘− ⌘0 make the text in a secret or notes window bigger, smaller, or the
+  size from Settings again.
 - **Directories collapse** in the folder tree with chevrons, and remember what you left open.
 - **The keyboard**: ↑ ↓ walk the rows, Return opens, Space shows a secret, ⇧Space the notes, ⌘L copies the address, ⌘↑ goes up,
   ⌘1 … ⌘9 switch tabs.
@@ -36,6 +37,8 @@ tags, a color code and, when you need one, a **secret** on each bookmark.
   way back in on a new Mac with the key file or a passphrase.
 - **Export** everything as one `.json` file (secrets only when you tick the box); **Validate** a file to see what
   is wrong with it, with where; **Import** replaces everything or adds the file's tabs beside yours.
+- **Import from a browser**: the bookmarks file Safari, Chrome, Firefox, Edge or Brave exports comes in as one
+  new tab, its folders as directories, in the browser's order.
 
 ## Install
 
@@ -49,7 +52,7 @@ your bookmarks stay in `~/Library/Application Support/Bookmark Manager/`.
 
 ## More
 
-- [Docs/USER_GUIDE.md](Docs/USER_GUIDE.md) — tabs, directories, bookmarks, secrets, the keyboard, search, colors, link checks, Settings, backups, export and import
+- [Docs/USER_GUIDE.md](Docs/USER_GUIDE.md) — tabs, directories, bookmarks, secrets, notes, the keyboard, search, colors, link checks, duplicates, Settings, backups, export and import (and from a browser)
 - [Docs/SCRIPTS.md](Docs/SCRIPTS.md) — INSTALL_APP.sh, BUILD_APP.sh, signing
 - [Docs/DEVELOPMENT.md](Docs/DEVELOPMENT.md) — how it is built, where things are kept, tests, development hooks
 - [CHANGELOG.md](CHANGELOG.md)

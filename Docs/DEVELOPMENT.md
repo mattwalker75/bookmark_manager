@@ -3,18 +3,18 @@
 ## Layout
 ```
 Sources/BookmarkManagerCore/   Models · Arrange · Search · Store · SecretBox · Transfer · Favicons · Backup (BackupFile,
-                               PassphraseWrap, Backup, BackupStore) · Duplicates · Version
+                               PassphraseWrap, Backup, BackupStore) · Duplicates · BrowserBookmarks (parse, makeTab, Transfer.importBrowser) · Version
 Sources/BookmarkManager/       BookmarkManagerApp (+ AppDelegate) · AppModel · MainWindow (KeyboardDriver, SearchBar, TabBar,
                                FolderTree, TreeBranch, TreeRow, FolderDetail, SubfolderRow, BookmarkRow, SiteIcon, DropGap, EndDrop)
                                SearchResults · Editors (BookmarkEditor, BrowserPicker, ColorPills, DestinationPicker, FolderEditor,
                                TabNameSheet, MoveSheet) · SecretWindow · NotesWindow (NotesWindows, NotesHolder, NotesView, NotesText) · SecretGate (Touch ID) · LinkCheck (LinkVerdict, LinkReport,
-                               LinkChecker) · LinkCheckView (LinkReportSheet, LinkBanner) · DuplicatesView (DuplicatesSheet, DuplicateRow) · SettingsView (GeneralPane, ColorCodesPane,
+                               LinkChecker) · LinkCheckView (LinkReportSheet, LinkBanner) · DuplicatesView (DuplicatesSheet, DuplicateRow) · BrowserImportView (BrowserImportSheet) · TextSize (TextSizeKeys) · SettingsView (GeneralPane, TextSizeRow, HideAfterRow, ColorCodesPane,
                                TransferPane, ValidationSheet) · BackupsView (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet)
                                Browsers · Icons (IconCache, IconFetcher) · Sample
                                Design · Themes · AppearancePane · PlainTextField · TextBox   ← adapted from App Starter (Themes adds
                                                               RGB.color and drops the bundle light; AppearancePane reworded; TextBox = ScriptEditor), keep in step
-Tests/BookmarkManagerCoreTests/  Models · Arrange · Search · Store · Transfer · Favicon · Backup · Duplicates · Notes · ReviewFix tests · Helpers (Scratch, Sample)
-Tests/BookmarkManagerTests/      AppModel, LinkCheck, DuplicatesModel, NotesModel, BackupModel and the review tests (each on a scratch BOOKMARKMANAGER_HOME;
+Tests/BookmarkManagerCoreTests/  Models · Arrange · Search · Store · Transfer · Favicon · Backup · Duplicates · Notes · BrowserImport · ReviewFix tests · Helpers (Scratch, Sample)
+Tests/BookmarkManagerTests/      AppModel, LinkCheck, DuplicatesModel, NotesModel, TextSize, BrowserImportModel, BackupModel and the review tests (each on a scratch BOOKMARKMANAGER_HOME;
                                  Home.folder() refuses the real folder under xctest anyway); TinyHTTP / SlowHTTP serve 127.0.0.1 only
 icon/                          icon.svg (Tabbed folder) → make_icns.sh → BookmarkManager.icns (committed)
 ```
@@ -22,7 +22,7 @@ icon/                          icon.svg (Tabbed folder) → make_icns.sh → Boo
 ## Build and test
 ```bash
 swift build          # debug build of everything
-swift test           # 140 tests, under a minute
+swift test           # 151 tests, under a minute
 ./BUILD_APP.sh       # build/Bookmark Manager.app (release, ad-hoc signed)
 ```
 
@@ -45,12 +45,24 @@ for all secret windows); changing the seconds re-arms every open window. `Secret
 password) before `showSecret` when Settings say so; one pass covers 60 s; one prompt at a time.
 
 Notes windows (`NotesWindows`, Nov 8 2026) are built the same way, minus the hide timer and the gate: a
-`NotesHolder` carries the bookmark, `editing` and the `draft`; `isDirty` = editing and the draft differs from what
+`NotesHolder` carries a `NotesItem` (a bookmark's notes or a directory's — same window, Show directory in place
+of Open bookmark), `editing` and the `draft`; `isDirty` = editing and the draft differs from what
 is saved (the window's `isDocumentEdited` dot follows it). `NotesText` is one NSTextView: read mode shows the saved
 text with addresses made links (`NSDataDetector`; a click goes through `AppModel.openLinkFromNotes`), edit mode is a
 plain text box. `windowShouldClose` asks Save / Don't Save / Cancel as a sheet when dirty; `settleBeforeQuit` asks
 once for all dirty windows before the quit-time backup. `AppModel.saveNotes` / `deleteNotes` go through
-`updateBookmark`; the library stamps `notesEditedAt` when the text changed. Notes live in library.json (plain).
+`updateBookmark` (or `updateFolder` with `hasNotes`/`notes` for a directory); the library stamps `notesEditedAt`
+when the text changed. Notes live in library.json (plain). **Text size** (Nov 8 2026): each holder carries a
+`textSize` (points) that starts at Settings' `secretTextSize` / `notesTextSize`; `TextSizeKeys` is one local key
+monitor turning ⌘+ ⌘= ⌘− ⌘0 in a secret or notes window into `adjustText(in:by:)`, which refits the window while
+it is still the fitted size; the View menu items do the same for the key window (`AppModel.textWindowIsKey`).
+
+**Import from a browser** (`BrowserBookmarks`, Nov 8 2026): `parse` tokenizes the NETSCAPE-Bookmark-file HTML
+(H3 folders, A links, DD descriptions, Firefox TAGS; entities decoded; bookmarklets / `place:` links skipped and
+counted; empty folders pruned and counted; the top folder names guess the browser) into a `File`; `makeTab`
+builds one `Folder` (fresh ids), folding folders deeper than `maxLevels` into the directory above;
+`Transfer.importBrowser` raises `maxDepth` to fit (up to 6) and appends the tab. `BrowserImportSheet` shows the
+counts and the levels sentence; `AppModel.importBrowser` saves and selects the tab.
 
 Site icons: `IconCache.image(for:fetch:)` answers from memory or `<home>/icons/<host>.png`, else queues one fetch
 (at most `atOnce` = 4 running; `IconFetcher`: the site ROOT's HTML — never the bookmark's path — →
@@ -96,7 +108,8 @@ with the library exactly as in library.json (plus the secrets when included).
 - `BOOKMARKMANAGER_HOME=<folder>` — use a scratch folder instead of Application Support. **Always** for trying things.
 - `BOOKMARKMANAGER_SAMPLE=1` — with an empty home, fill in example tabs and bookmarks (`Sample.swift`).
 - `BOOKMARKMANAGER_AUTOSHEET=newBookmark | editBookmark | edit:<name prefix> | newFolder | editFolder | newTab | move | secret |
-  notes | notes:<name prefix> | notesedit:<name prefix> | search:<text> | settings[:general|colors|appearance|backups|transfer][:end]` — open that sheet / window a second after launch (`:end` scrolls the pane to its end)
+  notes | notes:<name prefix> | notesedit:<name prefix> | editdir:<name prefix> | search:<text> | textsize:<points> |
+  browserimport:<path to an .html file> | settings[:general|colors|appearance|backups|transfer][:end]` — open that sheet / window a second after launch (`:end` scrolls the pane to its end; `notes:` finds a bookmark first, then a directory; `textsize:` sets every open secret / notes window; `browserimport:` opens the import sheet over that file in a window of its own)
   (`newSecret` opens the bookmark editor with Secret only picked; `secret:<name prefix>` opens that bookmark's secret
   window, e.g. `secret:Backup` for the long sample secret; `keys:125,125,36` posts those key codes to the main
   window like real presses — 125 ↓, 126 ↑, 36 Return, 49 Space). Several steps run a second apart when separated
