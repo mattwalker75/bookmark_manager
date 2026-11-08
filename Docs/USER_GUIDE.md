@@ -123,6 +123,19 @@ hidden until you ask for it.
   month, the app checks quietly a few seconds after launch and puts a line above the list when something didn't
   answer. Nothing else in the app visits a bookmark's full address.
 
+## Finding duplicates
+- Settings → General → **Find duplicate bookmarks…** (or the Bookmarks menu) lists every group of bookmarks that
+  point at the same page, each with where it lives. Two kinds: **same address** (letter for letter) and **same
+  page, written differently** — http or https, with or without www, a trailing slash, tracking bits after "?"
+  (utm_…, fbclid and the like), a #part. Each row has Show in place, Edit… and Delete… (asked first). Nothing is
+  deleted by itself, and the sheet looks at the library as it is right now, so there is nothing to re-run.
+- Some duplicates are meant: one bookmark per Gmail account, all at the same address. Click **Meant to be the
+  same — keep all N** on the group and every bookmark in it is marked; the group is left out from then on. The
+  mark is the **Leave out of duplicate checks** switch in each bookmark's editor, so it can be undone one by one;
+  the sheet's **Show the N left out** checkbox shows those groups dimmed, with **Look at these again** to unmark
+  them all. If a new bookmark lands at a marked page later, the group shows again with the new one in it.
+- Secret-only items have no address, so they are never duplicates.
+
 ## Color codes
 - Settings → **Color codes**: each color has a name — *Important*, *Work*, *Personal*, *Reference* to start.
   Change a color (click the swatch) or its name, add more (up to 10), remove one. Removing a color asks first and

@@ -46,6 +46,7 @@ struct MainWindow: View {
             case .renameTab(let t): TabNameSheet(tab: t)
             case .move(let item): MoveSheet(item: item)
             case .linkReport: LinkReportSheet()
+            case .duplicates: DuplicatesSheet()
             }
         }
         .alert(item: $model.notice) { n in Alert(title: Text(n.title), message: Text(n.message), dismissButton: .default(Text("OK"))) }
@@ -54,7 +55,7 @@ struct MainWindow: View {
     }
 
     /// Development only, harmless when unset (for trying screens on a scratch BOOKMARKMANAGER_HOME):
-    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|search:<text>|settings[:tab]
+    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|duplicates|search:<text>|settings[:tab]
     private func developmentHooks() {
         guard let hooks = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_AUTOSHEET"] else { return }
         // several steps separated by ";" run a second apart: "search:admin;keys:125,125,36"
@@ -77,6 +78,7 @@ struct MainWindow: View {
             case "move": if let b { model.sheet = .move(.bookmark(b.id)) }
             case "secret": if let b { model.showSecret(b) }
             case "linkcheck": model.checkLinks()
+            case "duplicates": model.sheet = .duplicates
             case "backupcheck":
                 // the Verify sheet for the newest backup, in a window of its own (there is one: the launch wrote it)
                 model.refreshBackups()

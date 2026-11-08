@@ -19,9 +19,12 @@ enum MainSheet: Identifiable {
     case move(DragItem)
     /// the link check: its progress, then its problems
     case linkReport
+    /// the duplicates: every group of bookmarks at the same page (Matt, Nov 8 2026)
+    case duplicates
     var id: String {
         switch self {
         case .linkReport: return "linkReport"
+        case .duplicates: return "duplicates"
         case .newBookmark(let p): return "newBookmark-\(p)"
         case .newSecret(let p): return "newSecret-\(p)"
         case .editBookmark(let b): return "editBookmark-\(b.id)"
@@ -206,6 +209,14 @@ final class AppModel: ObservableObject {
             checkLinks(automatic: true)
         }
     }
+
+    // MARK: duplicates (Matt, Nov 8 2026)
+
+    /// Every group of bookmarks at the same page, worked out from the library as it is now (nothing is kept on
+    /// disk: it takes no time, and the marks live on the bookmarks themselves).
+    var duplicates: DuplicateReport { library.findDuplicates() }
+    /// "Meant to be the same" on a group (or "Look at these again"): every member marked, or unmarked.
+    func keepDuplicates(_ ids: [UUID], _ kept: Bool) { change("The bookmarks weren't marked") { $0.setKeptAsDuplicates(ids, kept) } }
 
     // MARK: the folder tree's open and closed branches (Matt, Oct 29 2026: chevrons, remembered)
 

@@ -42,6 +42,7 @@ struct BookmarkManagerApp: App {
                 Divider()
                 Button("Check Links in This Directory…") { model.checkLinks(in: model.selectedPath) }.disabled(model.isSearching || model.linkCheckRunning)
                 Button("Check Every Address…") { model.checkLinks() }.disabled(model.linkCheckRunning)
+                Button("Find Duplicate Bookmarks…") { model.sheet = .duplicates }
                 Divider()
                 // the keyboard (Matt, Oct 29 2026); ↑ ↓ Return Space are handled in the window itself (KeyboardDriver)
                 Button("Copy Address") { model.copyFocusedAddress() }.keyboardShortcut("l").disabled(model.focusedBookmark.map(\.isSecretOnly) ?? true)

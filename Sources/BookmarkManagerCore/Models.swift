@@ -51,13 +51,16 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
     public var browser: String?
     /// left out of link checks (Matt, Oct 30 2026: a site that always complains but is wanted anyway)
     public var skipLinkCheck: Bool
+    /// meant to share its page with other bookmarks (Matt, Nov 8 2026: one bookmark per Gmail account, all at the
+    /// same address) — the duplicates sheet leaves a group out once every member is marked
+    public var skipDuplicateCheck: Bool
 
-    public init(id: UUID = UUID(), name: String, description: String = "", url: String, tags: [String] = [], colorId: UUID? = nil, hasSecret: Bool = false, secret: String = "", browser: String? = nil, skipLinkCheck: Bool = false) {
+    public init(id: UUID = UUID(), name: String, description: String = "", url: String, tags: [String] = [], colorId: UUID? = nil, hasSecret: Bool = false, secret: String = "", browser: String? = nil, skipLinkCheck: Bool = false, skipDuplicateCheck: Bool = false) {
         self.id = id; self.name = name; self.description = description; self.url = url; self.tags = tags
-        self.colorId = colorId; self.hasSecret = hasSecret; self.secret = secret; self.browser = browser; self.skipLinkCheck = skipLinkCheck
+        self.colorId = colorId; self.hasSecret = hasSecret; self.secret = secret; self.browser = browser; self.skipLinkCheck = skipLinkCheck; self.skipDuplicateCheck = skipDuplicateCheck
     }
 
-    enum CodingKeys: String, CodingKey { case id, name, description, url, tags, colorId, hasSecret, secret, browser, skipLinkCheck }
+    enum CodingKeys: String, CodingKey { case id, name, description, url, tags, colorId, hasSecret, secret, browser, skipLinkCheck, skipDuplicateCheck }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
@@ -70,6 +73,7 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
         secret = try c.decodeIfPresent(String.self, forKey: .secret) ?? ""
         browser = try c.decodeIfPresent(String.self, forKey: .browser).flatMap { $0.isEmpty ? nil : $0 }
         skipLinkCheck = (try? c.decodeIfPresent(Bool.self, forKey: .skipLinkCheck)) ?? false
+        skipDuplicateCheck = (try? c.decodeIfPresent(Bool.self, forKey: .skipDuplicateCheck)) ?? false
     }
 
     /// A secret-only item: no address at all (a passphrase for a phone, a Wi-Fi password). Its row shows a key

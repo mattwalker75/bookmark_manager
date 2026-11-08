@@ -27,6 +27,7 @@ enum Sample {
         ])
         let workTab = Folder(name: "Work", folders: [selfHosted, vendors, reading], bookmarks: [
             Bookmark(name: "Mac mini dashboard", url: "http://mini.local:8080"),
+            Bookmark(name: "Gmail · photo business", description: "Client mail and invoices.", url: "https://mail.google.com/mail/u/0/", tags: ["mail"], colorId: work),
             Bookmark(name: "Tailscale admin", description: "Machines, keys and the DNS name for each tool.", url: "https://login.tailscale.com/admin", tags: ["network", "vpn"], colorId: work, hasSecret: true, secret: "auth key (expires yearly): tskey-example"),
             Bookmark(name: "Wi-Fi password", description: "Guest network and the admin password.", url: "", tags: ["wifi"], hasSecret: true, secret: "guest: MintyFresh-2026\nadmin: example-only"),
             Bookmark(name: "Backup passphrase", url: "", tags: ["restic", "backup"], colorId: important, hasSecret: true, secret: "restic repository: sftp:backup@mini:/srv/restic\nrepository password: correct-horse-battery-staple-91\n\nrecovery words (24):\n 1. ladder    2. velvet    3. orbit     4. canyon\n 5. mango     6. thunder   7. pixel     8. harbor\n 9. walnut   10. comet    11. fossil   12. lantern\n13. marble   14. saddle   15. tundra   16. violin\n17. anchor   18. nectar   19. quartz   20. ribbon\n21. summit   22. tiger    23. umbrella 24. zephyr\n\nTime Machine disk password:\nTM-9f3a-kelp-2c7e\n\nOff-site copy (Backblaze B2):\nkeyID: 0045a1b2c3d4e5f0000000003\napplicationKey: K004-example-only\nbucket: mini-offsite-2026\n\nEncrypted DMG (old laptop):\nPhotos-2019.dmg → \"sierra nevada 1987\""),
@@ -37,11 +38,14 @@ enum Sample {
                 Bookmark(name: "Router admin page", url: "http://192.168.1.1", tags: ["network"]),
             ]),
             Folder(name: "Recipes", bookmarks: [Bookmark(name: "Serious Eats", url: "https://www.seriouseats.com", colorId: personal)]),
+        ], bookmarks: [
+            Bookmark(name: "Gmail · personal", url: "https://mail.google.com/mail/u/0/", tags: ["mail"], colorId: personal),
         ])
         let devTab = Folder(name: "Dev", folders: [
             Folder(name: "GitHub", bookmarks: [
                 Bookmark(name: "GitHub organization settings", url: "https://github.com/organizations/example/settings/admin", colorId: reference),
                 Bookmark(name: "Pull requests", url: "https://github.com/pulls"),
+                Bookmark(name: "PRs (old link)", description: "Saved twice by accident.", url: "http://www.github.com/pulls/?utm_source=newsletter"),
             ]),
         ], bookmarks: [Bookmark(name: "Swift Package Index", url: "https://swiftpackageindex.com", tags: ["swift", "packages"])])
         let financeTab = Folder(name: "Finance", bookmarks: [Bookmark(name: "Bank", url: "https://www.example-bank.com", colorId: important, hasSecret: true, secret: "user: example")])

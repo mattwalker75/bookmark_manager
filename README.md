@@ -25,6 +25,9 @@ tags, a color code and, when you need one, a **secret** on each bookmark.
   ⌘1 … ⌘9 switch tabs.
 - **Check links**: ask every address (or one directory's) once and see which are gone, moved or didn't answer,
   with marks on the rows; an optional weekly or monthly schedule.
+- **Find duplicates**: every group of bookmarks at the same page (letter for letter, or written differently — www,
+  a trailing slash, tracking bits), with Show in place / Edit / Delete; mark a group as meant to be the same
+  (several Gmail accounts) and it is left out from then on.
 - **Backups** (Settings → Backups): dated backup files of everything, secrets sealed with this Mac's key (or in
   plain text if you choose), written daily and on quit, kept versions that never age out, Verify, Restore — and a
   way back in on a new Mac with the key file or a passphrase.

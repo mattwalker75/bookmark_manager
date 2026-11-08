@@ -18,13 +18,14 @@ it is not a developer: every message is a plain sentence.
   - `Search.swift` — `Library.search` (names, addresses, tags; directory names) → `SearchHit` with its path.
   - `Store.swift` (library.json, Home, `BOOKMARKMANAGER_HOME`), `SecretBox.swift` (AES-GCM secrets.enc + secret.key),
     `Transfer.swift` (export / `validate` / `apply` import), `Favicons.swift` (where a site's icon is; no network),
-    `Backup.swift` (BackupFile, PassphraseWrap, Backup.make/read/check, BackupStore).
+    `Backup.swift` (BackupFile, PassphraseWrap, Backup.make/read/check, BackupStore), `Duplicates.swift`
+    (duplicateKey, findDuplicates → DuplicateReport, setKeptAsDuplicates).
 - `Sources/BookmarkManager/` — the app. `AppModel` drives the core (every change goes through `change { }`, which
   turns a refusal into a `Notice` and saves on success). `MainWindow` (SearchBar, TabBar, FolderTree, FolderDetail,
   BookmarkRow, SubfolderRow, drag/drop helpers), `SearchResults`, `Editors` (BookmarkEditor, FolderEditor,
   TabNameSheet, MoveSheet, ColorPills, DestinationPicker, BrowserPicker), `SecretWindow` (one NSWindow per bookmark,
   self-sizing, hide timer), `SecretGate` (Touch ID), `LinkCheck` + `LinkCheckView` (the link check and its sheet /
-  banner), `SettingsView` (General, Color codes, Appearance, Backups, Export & import + ValidationSheet),
+  banner), `DuplicatesView` (the duplicates sheet), `SettingsView` (General, Color codes, Appearance, Backups, Export & import + ValidationSheet),
   `BackupsView` (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet), `Browsers`, `Icons` (IconCache +
   IconFetcher), `Sample`. `MainWindow` also holds `KeyboardDriver`, `TreeBranch`, `TreeRow`. The look is App Starter's / Data Syncer's: `Design.swift`, `Themes.swift`,
   `AppearancePane.swift`, `PlainTextField.swift` are adapted copies (Themes adds `RGB.color`, drops the bundle light;
@@ -109,6 +110,15 @@ it is not a developer: every message is a plain sentence.
     where nothing answered keeps the old report (`linkNote`), Use new address refuses stale rows and non-web targets.
     **Clear** (Matt, Oct 30 2026): `clearLinkProblem(id, forever:)` drops the mark; `forever` sets `Bookmark.skipLinkCheck`
     (exported; the editor's "Leave out of link checks" switch undoes it) and `checkLinks` leaves such bookmarks out.
+10a. **Duplicates** (Matt, Nov 8 2026; mockup canvas 9XJEph4sNJnhKEHZfjvCe7 "Duplicates sheet"): `Library.findDuplicates()`
+    groups bookmarks by `duplicateKey` (no scheme, host lower-cased without www./default port, path without its
+    trailing slash, query without tracking names — `utm_*`, fbclid… — sorted, no fragment; mailto:/tel: as typed;
+    secret-only items never) → `DuplicateReport` (`exact` = letter for letter). NOTHING is deleted by itself; the
+    sheet (`DuplicatesSheet`, Settings → General → Duplicates, the Bookmarks menu, the `duplicates` dev hook) works
+    off the live library (no file). "Meant to be the same" = `Bookmark.skipDuplicateCheck` on every member
+    (`setKeptAsDuplicates`; exported; the editor's "Leave out of duplicate checks" undoes one); a group is
+    `allKept` (left out) only while EVERY member is marked, so a new bookmark at a marked page brings it back.
+    Addresses only — same NAMES are not duplicates (Matt had no say; my default, Nov 8 2026).
 11. **Files are never lost:** a damaged library.json / unreadable secrets are moved aside (`*.unreadable-<date>`) and
     reported; a damaged library.json takes a COPY of secrets.enc with it (review: the next save would prune them).
     Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json, then the prune — a failed library

@@ -27,6 +27,7 @@ struct GeneralPane: View {
     @State private var depth = 2
     @State private var depthProblem: String?
     @State private var showLinkReport = false
+    @State private var showDuplicates = false
 
     var body: some View {
         Form {
@@ -81,6 +82,15 @@ struct GeneralPane: View {
                 Text("Each address is asked for once, a few at a time, and only when you ask — by this button, by right-click → Check links in this directory, or by this schedule, which runs quietly a few seconds after launch and puts a line above the list when something didn't answer. Problem rows keep a red mark until the next check.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
+            Section("Duplicates") {
+                HStack(spacing: 10) {
+                    Button("Find duplicate bookmarks…") { showDuplicates = true }
+                    Spacer()
+                    Text(duplicatesText).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Text("Finds bookmarks that point at the same page — the same address, or one written a little differently (with or without www, a trailing slash, tracking bits). Nothing is deleted by itself: a sheet lists each group with where its bookmarks live. Mark a group as meant to be the same (several Gmail accounts, say) and it is left out from then on — undo that in the bookmark's editor.")
+                    .font(DS.secondary).foregroundStyle(.secondary)
+            }
             Section {
                 Toggle("Fetch site icons", isOn: $model.settings.fetchIcons)
                 Text("Each site's icon is fetched once from its address and kept on this Mac; a site without one shows the link glyph. Turned off, nothing is fetched (icons already here still show).")
@@ -100,6 +110,15 @@ struct GeneralPane: View {
         .onAppear { browsers = Browsers.installed(); depth = model.library.maxDepth }
         .onChange(of: model.library.maxDepth) { _, d in depth = d }
         .sheet(isPresented: $showLinkReport) { LinkReportSheet().environmentObject(model) }
+        .sheet(isPresented: $showDuplicates) { DuplicatesSheet().environmentObject(model).environmentObject(model.icons) }
+    }
+
+    /// "2 groups right now (5 bookmarks)" — worked out live; the library is small and this costs nothing
+    private var duplicatesText: String {
+        let r = model.duplicates
+        let g = r.shown.count
+        guard g > 0 else { return r.keptAway.isEmpty ? "None right now." : "None right now (\(r.keptAwayBookmarks) marked as meant to be the same)." }
+        return "\(g) group\(g == 1 ? "" : "s") right now (\(r.shownBookmarks) bookmarks)."
     }
 
     private var lastCheckText: String {

@@ -67,6 +67,10 @@ struct BookmarkEditor: View {
                     if bookmark.skipLinkCheck {
                         Text("Check every address skips this one — for a site that always turns the check away but works in the browser.").font(DS.secondary).foregroundStyle(.secondary)
                     }
+                    Toggle("Leave out of duplicate checks", isOn: $bookmark.skipDuplicateCheck)
+                    if bookmark.skipDuplicateCheck {
+                        Text("Marked as meant to share its page with other bookmarks (one per account, say). Find duplicate bookmarks leaves the group out once every bookmark in it is marked.").font(DS.secondary).foregroundStyle(.secondary)
+                    }
                 }
                 Field("Tags", $tagsText, "Optional — words for the search, separated by commas")
                 Text("Tags are only used by the search; they never show on the row.").font(DS.secondary).foregroundStyle(.secondary)

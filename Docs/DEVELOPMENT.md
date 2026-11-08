@@ -8,13 +8,13 @@ Sources/BookmarkManager/       BookmarkManagerApp (+ AppDelegate) · AppModel ·
                                FolderTree, TreeBranch, TreeRow, FolderDetail, SubfolderRow, BookmarkRow, SiteIcon, DropGap, EndDrop)
                                SearchResults · Editors (BookmarkEditor, BrowserPicker, ColorPills, DestinationPicker, FolderEditor,
                                TabNameSheet, MoveSheet) · SecretWindow · SecretGate (Touch ID) · LinkCheck (LinkVerdict, LinkReport,
-                               LinkChecker) · LinkCheckView (LinkReportSheet, LinkBanner) · SettingsView (GeneralPane, ColorCodesPane,
+                               LinkChecker) · LinkCheckView (LinkReportSheet, LinkBanner) · DuplicatesView (DuplicatesSheet, DuplicateRow) · SettingsView (GeneralPane, ColorCodesPane,
                                TransferPane, ValidationSheet) · BackupsView (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet)
                                Browsers · Icons (IconCache, IconFetcher) · Sample
                                Design · Themes · AppearancePane · PlainTextField · TextBox   ← adapted from App Starter (Themes adds
                                                               RGB.color and drops the bundle light; AppearancePane reworded; TextBox = ScriptEditor), keep in step
-Tests/BookmarkManagerCoreTests/  Models · Arrange · Search · Store · Transfer · Favicon · Backup · ReviewFix tests · Helpers (Scratch, Sample)
-Tests/BookmarkManagerTests/      AppModel, LinkCheck, BackupModel and the review tests (each on a scratch BOOKMARKMANAGER_HOME;
+Tests/BookmarkManagerCoreTests/  Models · Arrange · Search · Store · Transfer · Favicon · Backup · Duplicates · ReviewFix tests · Helpers (Scratch, Sample)
+Tests/BookmarkManagerTests/      AppModel, LinkCheck, DuplicatesModel, BackupModel and the review tests (each on a scratch BOOKMARKMANAGER_HOME;
                                  Home.folder() refuses the real folder under xctest anyway); TinyHTTP / SlowHTTP serve 127.0.0.1 only
 icon/                          icon.svg (Tabbed folder) → make_icns.sh → BookmarkManager.icns (committed)
 ```
@@ -92,7 +92,7 @@ with the library exactly as in library.json (plus the secrets when included).
   (`newSecret` opens the bookmark editor with Secret only picked; `secret:<name prefix>` opens that bookmark's secret
   window, e.g. `secret:Backup` for the long sample secret; `keys:125,125,36` posts those key codes to the main
   window like real presses — 125 ↓, 126 ↑, 36 Return, 49 Space). Several steps run a second apart when separated
-  by `;`: `search:admin;keys:125,125`. `linkreport` puts a made-up link report over the sample (marks + banner), `linkreport:sheet` also opens the sheet, `linkcheck` runs a real check (network!), `backupcheck` opens the Verify sheet for the newest backup in a window of its own.
+  by `;`: `search:admin;keys:125,125`. `linkreport` puts a made-up link report over the sample (marks + banner), `linkreport:sheet` also opens the sheet, `linkcheck` runs a real check (network!), `duplicates` opens the duplicates sheet (the sample holds two groups), `backupcheck` opens the Verify sheet for the newest backup in a window of its own.
 
 Screenshots: run `.build/debug/BookmarkManager` with those variables, then `screencapture -x -l <window id>`
 (after `caffeinate -u -t 1`; the window ids from `CGWindowListCopyWindowInfo`, owner `BookmarkManager`).

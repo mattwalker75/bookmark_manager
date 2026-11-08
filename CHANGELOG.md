@@ -4,6 +4,16 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
 
 ## [Unreleased]
 
+### Added
+- 2026-11-08: **Find duplicate bookmarks** (Matt) — Settings → General → Duplicates → *Find duplicate bookmarks…*
+  (and the Bookmarks menu) lists every group of bookmarks at the same page, each bookmark with where it lives
+  and Show in place / Edit… / Delete… (asked first). Two kinds: *same address* letter for letter, and *same
+  page, written differently* (http/https, www, a trailing slash, tracking bits after "?", a #part). Nothing is
+  deleted by itself. **Meant to be the same — keep all N** marks a group as intended (one bookmark per Gmail
+  account, say) and leaves it out from then on; the mark is the bookmark's *Leave out of duplicate checks*
+  switch in the editor (exported), and *Show the N left out* in the sheet brings such groups back with *Look at
+  these again*. A new bookmark at a marked page shows the group again.
+
 ### Changed
 - 2026-11-08: **Hide a secret window after … seconds** (Matt: "5 seconds or 999 seconds") — Settings → General →
   Secrets is now a number of seconds typed or stepped (1 to 86,400), with "= 5 minutes" beside it and a "Never
