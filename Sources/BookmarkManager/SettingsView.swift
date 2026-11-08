@@ -82,7 +82,8 @@ struct GeneralPane: View {
                 Text("Each address is asked for once, a few at a time, and only when you ask — by this button, by right-click → Check links in this directory, or by this schedule, which runs quietly a few seconds after launch and puts a line above the list when something didn't answer. Problem rows keep a red mark until the next check.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
-            Section("Duplicates") {
+            // under the "Links" heading with the link check and the site icons (Matt, Nov 8 2026): a card of its own, no title
+            Section {
                 HStack(spacing: 10) {
                     Button("Find duplicate bookmarks…") { showDuplicates = true }
                     Spacer()

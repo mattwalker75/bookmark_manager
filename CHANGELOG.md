@@ -17,7 +17,7 @@ Matt, Nov 8 2026: in daily use with zero issues, so this is 1.0 — with the thr
   until the editor turns them on again). Addresses in the notes are clickable; **Open bookmark** opens the site;
   the bottom line says when the notes were last changed. ⇧Space on a row shows its notes; the Bookmarks menu has
   **Show Notes**.
-- 2026-11-08: **Find duplicate bookmarks** (Matt) — Settings → General → Duplicates → *Find duplicate bookmarks…*
+- 2026-11-08: **Find duplicate bookmarks** (Matt) — Settings → General → Links → *Find duplicate bookmarks…*
   (and the Bookmarks menu) lists every group of bookmarks at the same page, each bookmark with where it lives
   and Show in place / Edit… / Delete… (asked first). Two kinds: *same address* letter for letter, and *same
   page, written differently* (http/https, www, a trailing slash, tracking bits after "?", a #part). Nothing is
@@ -32,6 +32,8 @@ Matt, Nov 8 2026: in daily use with zero issues, so this is 1.0 — with the thr
   value while it had the cursor. It now shows the number straight away: 300 when nothing was ever set (Matt).
 
 ### Changed
+- 2026-11-08: Settings → General: the **Duplicates** title is gone — *Find duplicate bookmarks…* is a card of its
+  own under the **Links** heading, with *Check every address…* and *Fetch site icons* (Matt).
 - 2026-11-08: **Hide a secret window after … seconds** (Matt: "5 seconds or 999 seconds") — Settings → General →
   Secrets is now a number of seconds typed or stepped (1 to 86,400), with "= 5 minutes" beside it and a "Never
   hide it by itself" switch, instead of the fixed list of minutes. A setting from before carries over (5 minutes →

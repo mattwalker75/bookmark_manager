@@ -118,6 +118,17 @@ struct MainWindow: View {
                     w.title = "Bookmark Manager Settings"; w.isReleasedWhenClosed = false
                     w.contentView = NSHostingView(rootView: SettingsView().environmentObject(model).environmentObject(model.icons).preferredColorScheme(model.lookInForce.colorScheme).tint(Theme.accent).font(DS.body))
                     w.makeKeyAndOrderFront(nil)
+                    // settings:<tab>:end — the pane scrolled to its end (for screenshots of what is below the fold)
+                    if sheet.hasSuffix(":end") {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            func scrollViews(_ v: NSView) -> [NSScrollView] { ((v as? NSScrollView).map { [$0] } ?? []) + v.subviews.flatMap(scrollViews) }
+                            for s in scrollViews(w.contentView!) {
+                                guard let doc = s.documentView else { continue }
+                                let y = doc.isFlipped ? max(0, doc.bounds.height - s.contentView.bounds.height) : 0
+                                s.contentView.scroll(to: NSPoint(x: 0, y: y)); s.reflectScrolledClipView(s.contentView)
+                            }
+                        }
+                    }
                 }
             }
         }

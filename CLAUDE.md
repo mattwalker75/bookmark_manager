@@ -129,7 +129,7 @@ it is not a developer: every message is a plain sentence.
     groups bookmarks by `duplicateKey` (no scheme, host lower-cased without www./default port, path without its
     trailing slash, query without tracking names — `utm_*`, fbclid… — sorted, no fragment; mailto:/tel: as typed;
     secret-only items never) → `DuplicateReport` (`exact` = letter for letter). NOTHING is deleted by itself; the
-    sheet (`DuplicatesSheet`, Settings → General → Duplicates, the Bookmarks menu, the `duplicates` dev hook) works
+    sheet (`DuplicatesSheet`, Settings → General under the Links heading — its own card, no title (Matt), the Bookmarks menu, the `duplicates` dev hook) works
     off the live library (no file). "Meant to be the same" = `Bookmark.skipDuplicateCheck` on every member
     (`setKeptAsDuplicates`; exported; the editor's "Leave out of duplicate checks" undoes one); a group is
     `allKept` (left out) only while EVERY member is marked, so a new bookmark at a marked page brings it back.
