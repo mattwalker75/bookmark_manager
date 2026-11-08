@@ -47,7 +47,7 @@ struct BookmarkManagerApp: App {
                 // the keyboard (Matt, Oct 29 2026); ↑ ↓ Return Space are handled in the window itself (KeyboardDriver)
                 Button("Copy Address") { model.copyFocusedAddress() }.keyboardShortcut("l").disabled(model.focusedBookmark.map(\.isSecretOnly) ?? true)
                 Button("Show Secret") { model.showFocusedSecret() }.disabled(!(model.focusedBookmark?.hasSecret ?? false))
-                Button("Show Notes") { model.showFocusedNotes() }.disabled(!(model.focusedBookmark?.hasNotes ?? false))
+                Button("Show Notes") { model.showFocusedNotes() }.disabled(!model.focusedHasNotes)
                 Button("Enclosing Directory") { model.goUp() }.keyboardShortcut(.upArrow, modifiers: .command).disabled(model.isSearching || model.selectedPath.isTabRoot)
             }
             // the text in a secret or notes window (Matt, Nov 8 2026): the same keys TextSizeKeys takes when such a window is key

@@ -1,11 +1,27 @@
-// The notes window (Matt, Nov 8 2026; mockup board "Notes window A"): a window of its own per bookmark with the
-// bookmark's notes — plain text for yourself, not a secret. It opens read-only (no accidental typing); Edit turns
+// The notes window (Matt, Nov 8 2026; mockup board "Notes window A"): a window of its own per bookmark — or per
+// directory (Matt, Nov 8 2026: notes on directories too) — with its notes: plain text for yourself, not a secret. It opens read-only (no accidental typing); Edit turns
 // the text box on, then Cancel / Save (⌘S). Closing with unsaved changes asks "Save your changes?"; Delete notes…
 // asks first and turns the bookmark's notes off. It never hides by itself, it sizes itself to its text like the
 // secret window, and it follows edits made elsewhere while it isn't being edited.
 import SwiftUI
 import AppKit
 import BookmarkManagerCore
+
+/// What a notes window shows: a bookmark's notes, or a directory's. The same window either way.
+struct NotesItem: Equatable {
+    var id: UUID
+    var name: String
+    var hasNotes: Bool
+    var notes: String
+    var editedAt: Date?
+    var isFolder: Bool
+    /// the bookmark itself, for the Open bookmark button (nil for a directory)
+    var bookmark: Bookmark?
+    init(_ b: Bookmark) { id = b.id; name = b.name; hasNotes = b.hasNotes; notes = b.notes; editedAt = b.notesEditedAt; isFolder = false; bookmark = b }
+    init(_ f: Folder) { id = f.id; name = f.name; hasNotes = f.hasNotes; notes = f.notes; editedAt = f.notesEditedAt; isFolder = true; bookmark = nil }
+    /// "bookmark" or "directory", for the sentences
+    var what: String { isFolder ? "directory" : "bookmark" }
+}
 
 @MainActor
 enum NotesWindows {
@@ -48,16 +64,18 @@ enum NotesWindows {
     /// the bookmarks whose notes window is being edited and differs from what is saved
     static var unsavedIds: [UUID] { holders.filter { $0.value.isDirty }.map(\.key) }
 
-    static func show(_ b: Bookmark, model: AppModel) {
-        guard b.hasNotes else { return }
-        if let w = windows[b.id] { holders[b.id]?.bookmark = b; w.makeKeyAndOrderFront(nil); return }
-        let holder = NotesHolder(bookmark: b, textSize: model.settings.notesTextSize)
+    static func show(_ b: Bookmark, model: AppModel) { show(NotesItem(b), model: model) }
+    static func show(folder f: Folder, model: AppModel) { show(NotesItem(f), model: model) }
+    static func show(_ item: NotesItem, model: AppModel) {
+        guard item.hasNotes else { return }
+        if let w = windows[item.id] { holders[item.id]?.item = item; w.makeKeyAndOrderFront(nil); return }
+        let holder = NotesHolder(item: item, textSize: model.settings.notesTextSize)
         holder.model = model
         NotesWindows.model = model
         let view = NotesView(holder: holder, model: model).environmentObject(model).environmentObject(model.icons)
-        let size = fittedSize(for: b.notes, screen: screenSize(), size: holder.textSize)
+        let size = fittedSize(for: item.notes, screen: screenSize(), size: holder.textSize)
         let w = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        w.title = "Notes · \(b.name)"
+        w.title = "Notes · \(item.name)"
         w.isReleasedWhenClosed = false
         w.contentView = NSHostingView(rootView: view)
         w.minSize = floor
@@ -65,20 +83,22 @@ enum NotesWindows {
         w.delegate = Closer.shared
         holder.fitted = size
         holder.window = w
-        windows[b.id] = w; holders[b.id] = holder
+        windows[item.id] = w; holders[item.id] = holder
         w.makeKeyAndOrderFront(nil)
     }
 
-    /// The bookmark changed elsewhere: the title follows; the text follows unless it is being edited here
-    /// (the edit in hand wins when it is saved); the window refits unless it was resized by hand.
-    static func refresh(_ b: Bookmark) {
-        guard let w = windows[b.id], let holder = holders[b.id] else { return }
-        if !b.hasNotes { holder.editing = false; close(b.id); return }
-        let textChanged = holder.bookmark.notes != b.notes
-        holder.bookmark = b
-        w.title = "Notes · \(b.name)"
+    /// The bookmark (or directory) changed elsewhere: the title follows; the text follows unless it is being
+    /// edited here (the edit in hand wins when it is saved); the window refits unless it was resized by hand.
+    static func refresh(_ b: Bookmark) { refresh(NotesItem(b)) }
+    static func refresh(folder f: Folder) { refresh(NotesItem(f)) }
+    static func refresh(_ item: NotesItem) {
+        guard let w = windows[item.id], let holder = holders[item.id] else { return }
+        if !item.hasNotes { holder.editing = false; close(item.id); return }
+        let textChanged = holder.item.notes != item.notes
+        holder.item = item
+        w.title = "Notes · \(item.name)"
         if textChanged, !holder.editing, let content = w.contentView, content.frame.size == holder.fitted {
-            let size = fittedSize(for: b.notes, screen: screenSize(), size: holder.textSize)
+            let size = fittedSize(for: item.notes, screen: screenSize(), size: holder.textSize)
             w.setContentSize(size)
             holder.fitted = size
         }
@@ -103,7 +123,7 @@ enum NotesWindows {
         holder.textSize = clamped
         // the window fits its text again at the new size, unless it was resized by hand (or is being typed in)
         if !holder.editing, let content = w.contentView, content.frame.size == holder.fitted {
-            let s = fittedSize(for: holder.bookmark.notes, screen: screenSize(), size: clamped)
+            let s = fittedSize(for: holder.item.notes, screen: screenSize(), size: clamped)
             w.setContentSize(s); holder.fitted = s
         }
     }
@@ -122,7 +142,7 @@ enum NotesWindows {
         guard !dirty.isEmpty else { return true }
         let n = dirty.count
         let a = NSAlert()
-        a.messageText = n == 1 ? "The notes for “\(dirty[0].bookmark.name)” have unsaved changes" : "\(n) notes windows have unsaved changes"
+        a.messageText = n == 1 ? "The notes for “\(dirty[0].item.name)” have unsaved changes" : "\(n) notes windows have unsaved changes"
         a.informativeText = "Save keeps what you typed; Quit Without Saving puts the notes back the way they were."
         a.addButton(withTitle: n == 1 ? "Save and Quit" : "Save All and Quit")
         a.addButton(withTitle: "Cancel")
@@ -147,7 +167,7 @@ enum NotesWindows {
             MainActor.assumeIsolated {
                 guard let id = windows.first(where: { $0.value === w })?.key, let h = holders[id], h.isDirty else { return true }
                 let a = NSAlert()
-                a.messageText = "Save your changes to the notes for “\(h.bookmark.name)”?"
+                a.messageText = "Save your changes to the notes for “\(h.item.name)”?"
                 a.informativeText = "You edited the notes. Save keeps what you typed; Don’t Save puts the notes back the way they were."
                 a.addButton(withTitle: "Save")
                 a.addButton(withTitle: "Cancel")
@@ -169,7 +189,7 @@ enum NotesWindows {
 
 @MainActor
 final class NotesHolder: ObservableObject {
-    @Published var bookmark: Bookmark { didSet { updateEdited() } }
+    @Published var item: NotesItem { didSet { updateEdited() } }
     /// the text box is on (Edit was clicked); `draft` is what is being typed
     @Published var editing = false { didSet { updateEdited() } }
     @Published var draft = "" { didSet { updateEdited() } }
@@ -179,20 +199,21 @@ final class NotesHolder: ObservableObject {
     var fitted = NSSize.zero
     weak var model: AppModel?
     weak var window: NSWindow?
-    init(bookmark: Bookmark, textSize: Int = AppSettings.defaultTextSize) { self.bookmark = bookmark; self.textSize = textSize }
+    init(item: NotesItem, textSize: Int = AppSettings.defaultTextSize) { self.item = item; self.textSize = textSize }
+    convenience init(bookmark: Bookmark, textSize: Int = AppSettings.defaultTextSize) { self.init(item: NotesItem(bookmark), textSize: textSize) }
 
-    var isDirty: Bool { editing && draft != bookmark.notes }
+    var isDirty: Bool { editing && draft != item.notes }
     /// the macOS dot in the close button
     private func updateEdited() { window?.isDocumentEdited = isDirty }
 
-    func beginEdit() { draft = bookmark.notes; editing = true }
-    func cancelEdit() { editing = false; draft = bookmark.notes }
+    func beginEdit() { draft = item.notes; editing = true }
+    func cancelEdit() { editing = false; draft = item.notes }
     /// Saves the draft through the model; false when the save was refused (the window stays as it is).
     @discardableResult
     func save() -> Bool {
         guard let model else { return false }
-        guard model.saveNotes(bookmark.id, draft) else { return false }
-        if let b = model.library.bookmark(bookmark.id) { bookmark = b }
+        guard model.saveNotes(item.id, draft) else { return false }
+        if let saved = model.notesItem(item.id) { item = saved }
         editing = false
         return true
     }
@@ -201,7 +222,7 @@ final class NotesHolder: ObservableObject {
 struct NotesView: View {
     @ObservedObject var holder: NotesHolder
     @ObservedObject var model: AppModel
-    static let emptyText = "(No notes have been typed for this bookmark yet. Click Edit to add some.)"
+    static let emptyText = "(No notes have been typed here yet. Click Edit to add some.)"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -210,7 +231,7 @@ struct NotesView: View {
                 Text(holder.editing ? "Type your changes. Save keeps them (⌘S); Cancel puts the notes back." : "Plain notes for yourself. They stay open as long as you like; Edit to change them.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
-            NotesText(text: $holder.draft, shown: holder.bookmark.notes.isEmpty ? NotesView.emptyText : holder.bookmark.notes, editable: holder.editing, muted: holder.bookmark.notes.isEmpty, font: NotesWindows.font(holder.textSize), openLink: { model.openLinkFromNotes($0) })
+            NotesText(text: $holder.draft, shown: holder.item.notes.isEmpty ? NotesView.emptyText : holder.item.notes, editable: holder.editing, muted: holder.item.notes.isEmpty, font: NotesWindows.font(holder.textSize), openLink: { model.openLinkFromNotes($0) })
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 8) {
                 Text(lastEdited).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1)
@@ -219,7 +240,8 @@ struct NotesView: View {
                     Button("Cancel") { holder.cancelEdit() }.keyboardShortcut(.cancelAction)
                     Button("Save") { holder.save() }.keyboardShortcut("s").buttonStyle(.borderedProminent).disabled(!holder.isDirty)
                 } else {
-                    if !holder.bookmark.isSecretOnly { Button("Open bookmark") { model.open(holder.bookmark) }.help("Open the bookmark in the browser") }
+                    if let b = holder.item.bookmark, !b.isSecretOnly { Button("Open bookmark") { model.open(b) }.help("Open the bookmark in the browser") }
+                    if holder.item.isFolder { Button("Show directory") { model.revealFolder(holder.item.id) }.help("Open the directory in the main window") }
                     Button("Delete notes…") { askDelete() }
                     Button("Edit") { holder.beginEdit() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
                 }
@@ -232,21 +254,21 @@ struct NotesView: View {
     }
 
     private var lastEdited: String {
-        guard let d = holder.bookmark.notesEditedAt else { return "" }
-        let lines = holder.bookmark.notes.isEmpty ? 0 : holder.bookmark.notes.components(separatedBy: "\n").count
+        guard let d = holder.item.editedAt else { return "" }
+        let lines = holder.item.notes.isEmpty ? 0 : holder.item.notes.components(separatedBy: "\n").count
         return "Last edited \(d.formatted(date: .abbreviated, time: .shortened))" + (lines > 0 ? " · \(lines) line\(lines == 1 ? "" : "s")" : "")
     }
 
-    /// Delete notes…: asked first (Cancel is the default, as every delete in the app); the bookmark stays.
+    /// Delete notes…: asked first (Cancel is the default, as every delete in the app); the bookmark or directory stays.
     private func askDelete() {
         guard let w = holder.window else { return }
-        let lines = holder.bookmark.notes.isEmpty ? 0 : holder.bookmark.notes.components(separatedBy: "\n").count
+        let lines = holder.item.notes.isEmpty ? 0 : holder.item.notes.components(separatedBy: "\n").count
         let a = NSAlert()
-        a.messageText = "Delete the notes for “\(holder.bookmark.name)”?"
-        a.informativeText = "The bookmark stays; only its notes\(lines > 0 ? " (\(lines) line\(lines == 1 ? "" : "s"))" : "") are thrown away. This can't be undone."
+        a.messageText = "Delete the notes for “\(holder.item.name)”?"
+        a.informativeText = "The \(holder.item.what) stays; only its notes\(lines > 0 ? " (\(lines) line\(lines == 1 ? "" : "s"))" : "") are thrown away. This can't be undone."
         a.addButton(withTitle: "Cancel")
         a.addButton(withTitle: "Delete notes")
-        let id = holder.bookmark.id
+        let id = holder.item.id
         a.beginSheetModal(for: w) { r in
             MainActor.assumeIsolated { if r == .alertSecondButtonReturn { model.deleteNotes(id) } }
         }

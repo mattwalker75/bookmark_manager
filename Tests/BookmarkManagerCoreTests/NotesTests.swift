@@ -65,6 +65,60 @@ final class NotesTests: XCTestCase {
         XCTAssertEqual(imported.allBookmarks.first { $0.name == "Stray" }?.notes, "")
     }
 
+    /// Notes on a directory (Matt, Nov 8 2026): the same rules as a bookmark's, through addFolder / updateFolder.
+    func testNotesOnADirectory() throws {
+        var lib = Sample.library()
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000), t1 = t0.addingTimeInterval(3_600), t2 = t1.addingTimeInterval(3_600)
+        let id = try lib.addFolder(name: "Squarespace site", description: "The photo site", hasNotes: true, notes: "Status: hero photo swapped.", in: FolderPath(tab: Sample.work), now: t0)
+        var f = try XCTUnwrap(lib.folder(id))
+        XCTAssertTrue(f.hasNotes); XCTAssertEqual(f.notes, "Status: hero photo swapped."); XCTAssertEqual(f.notesEditedAt, t0)
+        // a save that leaves the notes alone (nil) keeps text and date; the same text keeps the date; new text gets one
+        try lib.updateFolder(id, name: "Squarespace site", description: "Renamed", colorId: nil, now: t1)
+        f = try XCTUnwrap(lib.folder(id)); XCTAssertEqual(f.notes, "Status: hero photo swapped."); XCTAssertEqual(f.notesEditedAt, t0); XCTAssertEqual(f.description, "Renamed")
+        try lib.updateFolder(id, name: f.name, description: f.description, colorId: nil, hasNotes: true, notes: f.notes, now: t1)
+        XCTAssertEqual(lib.folder(id)?.notesEditedAt, t0)
+        try lib.updateFolder(id, name: f.name, description: f.description, colorId: nil, hasNotes: true, notes: "Status: done.", now: t2)
+        XCTAssertEqual(lib.folder(id)?.notes, "Status: done."); XCTAssertEqual(lib.folder(id)?.notesEditedAt, t2)
+        // notes without text: allowed, no date; the switch off: text and date go
+        let empty = try lib.addFolder(name: "Later", hasNotes: true, in: FolderPath(tab: Sample.home), now: t0)
+        XCTAssertNil(lib.folder(empty)?.notesEditedAt); XCTAssertTrue(lib.folder(empty)?.hasNotes ?? false)
+        try lib.updateFolder(id, name: f.name, description: "", colorId: nil, hasNotes: false, notes: "whatever", now: t2)
+        let off = try XCTUnwrap(lib.folder(id))
+        XCTAssertFalse(off.hasNotes); XCTAssertEqual(off.notes, ""); XCTAssertNil(off.notesEditedAt)
+        // a directory without notes: no stray text sneaks in
+        try lib.updateFolder(id, name: f.name, description: "", colorId: nil, notes: "typed with the switch off", now: t2)
+        XCTAssertEqual(lib.folder(id)?.notes, "")
+        // an old file: no notes keys on a directory at all
+        let old = try JSON.decoder.decode(Folder.self, from: Data(#"{"name":"Old","folders":[],"bookmarks":[]}"#.utf8))
+        XCTAssertFalse(old.hasNotes); XCTAssertEqual(old.notes, ""); XCTAssertNil(old.notesEditedAt)
+    }
+
+    func testDirectoryNotesAreExportedSearchedAndTidiedLikeABookmarks() throws {
+        var lib = Sample.library()
+        let id = try lib.addFolder(name: "Squarespace site", hasNotes: true, notes: "Billing is under Account › Invoices, not Payments.", in: FolderPath(tab: Sample.work))
+        // in the file, in the export, back from the export
+        let s = Scratch(); let store = LibraryStore(folder: s.url); try store.save(lib)
+        XCTAssertTrue(s.read("library.json").contains("Billing is under"))
+        XCTAssertEqual(try store.load().folder(id)?.notes, lib.folder(id)?.notes)
+        let data = try Transfer.export(lib, includeSecrets: false)
+        XCTAssertEqual(try Transfer.read(data).library.folder(id)?.notes, lib.folder(id)?.notes)
+        XCTAssertTrue(Transfer.validate(data).canImport)
+        // the search finds them, by name and by notes; descriptions still not
+        XCTAssertEqual(lib.search("invoices").map(\.id), [id]); XCTAssertEqual(lib.search("invoices")[0].matched, ["notes"])
+        XCTAssertEqual(lib.search("squarespace invoices")[0].matched, ["name", "notes"])
+        XCTAssertTrue(lib.search("invoices")[0].isFolder)
+        XCTAssertFalse(lib.search("logins and health").contains { $0.id == Sample.admin }, "a description is not searched")
+        // stray notes on a directory not marked as having notes: a note in Validate, dropped on import
+        var stray = lib
+        stray.modify(at: FolderPath(tab: Sample.work).appending(Sample.reading)) { $0.notes = "left over" }
+        let report = Transfer.validate(try Transfer.export(stray, includeSecrets: false))
+        XCTAssertTrue(report.canImport)
+        XCTAssertTrue(report.notes.contains { $0.place == "Work › Reading" && $0.text.contains("isn't marked as having notes") })
+        let imported = Transfer.apply(try Transfer.read(try Transfer.export(stray, includeSecrets: false)), to: Library.fresh(), mode: .replace).library
+        XCTAssertEqual(imported.folder(Sample.reading)?.notes, "")
+        XCTAssertFalse(stray.search("left over").contains { $0.id == Sample.reading }, "notes switched off are not searched")
+    }
+
     func testTheSearchFindsNotes() throws {
         var lib = Sample.library()
         let b = Bookmark(name: "Squarespace", url: "https://account.squarespace.com", hasNotes: true, notes: "Still to do: swap the Hero photo, then the Contact form.")

@@ -8,6 +8,11 @@ Matt, Nov 8 2026: three more things for the daily use — notes on directories, 
 bookmarks in, and bigger or smaller text in the secret and notes windows.
 
 ### Added
+- 2026-11-08: **Notes on directories** (Matt) — a directory or sub-directory can carry the same plain notes a
+  bookmark can: tick *This directory has notes* in its editor. Its row (and its search result) gets the **Notes**
+  button; right-click → Show notes; ⇧Space on the row. The same window — read-only until Edit, Save / Don't Save
+  on close, Delete notes… turns them off — with a **Show directory** button in place of Open bookmark. Found by
+  the search, in every export and backup. The sample library's *Self-hosted apps* shows one.
 - 2026-11-08: **Text size in secret and notes windows** (Matt) — ⌘+ makes the text bigger, ⌘− smaller, ⌘0 puts
   it back, for that one window while it is open (the window grows or shrinks to fit, unless you resized it by
   hand). Settings → General has the size each kind of window opens with (*Text size in a secret window*, *Text

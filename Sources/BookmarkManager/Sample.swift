@@ -16,7 +16,7 @@ enum Sample {
             Bookmark(name: "My Business Manager", description: "LLC books, invoices and the Network card.", url: "http://mbm.mini.ts.net:3030", tags: ["llc", "invoices"], hasSecret: true, secret: "login: matt\npassword: example-only"),
             Bookmark(name: "App Router", description: "The launcher with the health lights.", url: "http://router.mini.ts.net", tags: ["launcher"]),
             Bookmark(name: "Junk Tracker", description: "Splurges and weight, phone first.", url: "https://junk.mini.ts.net", tags: ["health"], colorId: personal),
-        ])
+        ], hasNotes: true, notes: "Status (Nov 8): People Manager and My Business Manager run on the mini; App Router points at both.\nNext: put Junk Tracker behind the router too, then retire the old dashboard.\n\nAll of these answer on their Tailscale names only — nothing is open to the internet.", notesEditedAt: Date().addingTimeInterval(-5 * 86_400))
         let vendors = Folder(name: "Vendors", description: "Accounts we pay for", bookmarks: [
             Bookmark(name: "Webull", description: "Brokerage. Sandbox keys live in the Trading Desk.", url: "https://www.webull.com", tags: ["broker", "trading"], colorId: important, hasSecret: true, secret: "account: 0000-0000\npin: 0000"),
             Bookmark(name: "Namecheap", description: "Domains and DNS.", url: "https://www.namecheap.com", tags: ["dns", "domains"], hasSecret: true, secret: "user: example\n2FA: authenticator app",

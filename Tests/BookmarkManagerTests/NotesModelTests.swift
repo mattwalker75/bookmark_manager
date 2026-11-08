@@ -44,6 +44,40 @@ final class NotesModelTests: XCTestCase {
         XCTAssertFalse(m.saveNotes(UUID(), "x")); XCTAssertEqual(m.notice?.title, "The notes weren't saved")
     }
 
+    /// Notes on a directory (Matt, Nov 8 2026): the same window and the same model calls, by the directory's id.
+    func testDirectoryNotesGoThroughTheSameModelCalls() throws {
+        let m = model()
+        let dir = try XCTUnwrap(m.library.allFolders.first { $0.name == "Self-hosted apps" })
+        XCTAssertTrue(dir.hasNotes, "the sample has notes on Self-hosted apps")
+        let item = try XCTUnwrap(m.notesItem(dir.id))
+        XCTAssertTrue(item.isFolder); XCTAssertNil(item.bookmark); XCTAssertEqual(item.name, dir.name); XCTAssertEqual(item.notes, dir.notes); XCTAssertEqual(item.what, "directory")
+        XCTAssertTrue(m.saveNotes(dir.id, "Status: everything moved."))
+        let saved = try XCTUnwrap(m.library.folder(dir.id))
+        XCTAssertEqual(saved.notes, "Status: everything moved."); XCTAssertGreaterThan(saved.notesEditedAt!, dir.notesEditedAt!)
+        XCTAssertEqual(try LibraryStore(folder: home).load().folder(dir.id)?.notes, "Status: everything moved.")
+        XCTAssertEqual(saved.description, dir.description, "the rest of the directory is untouched"); XCTAssertEqual(saved.bookmarks.count, dir.bookmarks.count)
+        // delete: the directory stays, the notes are off
+        m.deleteNotes(dir.id)
+        let after = try XCTUnwrap(m.library.folder(dir.id))
+        XCTAssertFalse(after.hasNotes); XCTAssertEqual(after.notes, ""); XCTAssertNil(after.notesEditedAt); XCTAssertEqual(after.bookmarks.count, dir.bookmarks.count)
+        // on again from the editor's side, through updateFolder; a plain rename leaves the notes alone
+        m.updateFolder(dir.id, name: after.name, description: after.description, colorId: nil, hasNotes: true, notes: "Back.")
+        XCTAssertEqual(m.library.folder(dir.id)?.notes, "Back.")
+        m.updateFolder(dir.id, name: "Self-hosted tools", description: after.description, colorId: nil)
+        XCTAssertEqual(m.library.folder(dir.id)?.notes, "Back."); XCTAssertEqual(m.library.folder(dir.id)?.name, "Self-hosted tools")
+        // the keyboard: the directory's row focused on its parent's page, ⇧Space has notes to show; the search finds them
+        m.select(FolderPath(tab: m.library.tabs[0].id)); m.focusId = dir.id
+        XCTAssertEqual(m.focusedFolder?.id, dir.id); XCTAssertTrue(m.focusedHasNotes); XCTAssertNil(m.focusedBookmark)
+        m.query = "back."
+        XCTAssertTrue(m.hits.contains { $0.id == dir.id && $0.isFolder })
+        // a new directory with notes typed in the editor
+        m.query = ""
+        m.addFolder(name: "Photo site", description: "", colorId: nil, hasNotes: true, notes: "Hero photo next.", in: FolderPath(tab: m.library.tabs[0].id))
+        let made = try XCTUnwrap(m.library.allFolders.first { $0.name == "Photo site" })
+        XCTAssertEqual(made.notes, "Hero photo next."); XCTAssertNotNil(made.notesEditedAt)
+        XCTAssertNil(m.notice)
+    }
+
     func testTheKeyboardAndTheSearchReachNotes() throws {
         let m = model()
         let pm = try XCTUnwrap(m.library.allBookmarks.first { $0.name == "People Manager" })

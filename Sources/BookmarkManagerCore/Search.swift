@@ -1,5 +1,5 @@
 // The search box at the top of the window: every word typed must be found in a bookmark's name, address, tags
-// or notes (or a directory's name), in any tab. Each hit says where it lives, so the window can show the path and
+// or notes (or a directory's name or notes), in any tab. Each hit says where it lives, so the window can show the path and
 // jump there.
 import Foundation
 
@@ -36,7 +36,7 @@ extension Library {
     /// Text as the search compares it: case and accents don't matter ("İstanbul" is found by "istanbul", "café" by "cafe").
     static func fold(_ s: String) -> String { s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
 
-    /// Every bookmark and directory, in every tab, that matches all the words (names, addresses, tags; directory names).
+    /// Every bookmark and directory, in every tab, that matches all the words (names, addresses, tags, notes; directory names and notes).
     public func search(_ query: String) -> [SearchHit] {
         let words = Library.words(query)
         guard !words.isEmpty else { return [] }
@@ -48,15 +48,27 @@ extension Library {
     private static func search(_ words: [String], in f: Folder, path: FolderPath, names: [String], into hits: inout [SearchHit]) {
         for sub in f.folders {
             let subPath = path.appending(sub.id), subNames = names + [sub.name]
-            let folded = fold(sub.name)
-            if words.allSatisfy({ folded.contains($0) }) {
-                hits.append(SearchHit(id: sub.id, kind: .folder(sub), path: subPath, names: subNames, matched: ["name"]))
+            if let matched = matchFolder(words, sub) {
+                hits.append(SearchHit(id: sub.id, kind: .folder(sub), path: subPath, names: subNames, matched: matched))
             }
             search(words, in: sub, path: subPath, names: subNames, into: &hits)
         }
         for b in f.bookmarks {
             if let matched = match(words, b) { hits.append(SearchHit(id: b.id, kind: .bookmark(b), path: path, names: names, matched: matched)) }
         }
+    }
+
+    /// A directory: its name and its notes (never its description). nil when some word matched nothing.
+    static func matchFolder(_ words: [String], _ f: Folder) -> [String]? {
+        let name = fold(f.name), notes = f.hasNotes ? fold(f.notes) : ""
+        var fields: [String] = []
+        for w in words {
+            var found = false
+            if name.contains(w) { found = true; if !fields.contains("name") { fields.append("name") } }
+            if notes.contains(w) { found = true; if !fields.contains("notes") { fields.append("notes") } }
+            if !found { return nil }
+        }
+        return fields
     }
 
     /// The fields that matched, or nil when some word matched nothing.

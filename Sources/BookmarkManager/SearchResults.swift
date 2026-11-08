@@ -102,6 +102,9 @@ struct HitRow: View {
             if case .bookmark(let b) = hit.kind, b.hasNotes {
                 Button { model.showNotes(b) } label: { Label("Notes", systemImage: "doc.text").font(DS.secondary) }.buttonStyle(.bordered).controlSize(.small)
             }
+            if case .folder(let f) = hit.kind, f.hasNotes {
+                Button { model.showNotes(f) } label: { Label("Notes", systemImage: "doc.text").font(DS.secondary) }.buttonStyle(.bordered).controlSize(.small)
+            }
             Button("Show in place") { model.showInPlace(hit) }.buttonStyle(.bordered).controlSize(.small)
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -121,6 +124,7 @@ struct HitRow: View {
                 Button("Edit…") { model.sheet = .editBookmark(b) }
             } else if case .folder(let f) = hit.kind {
                 Button("Open") { model.select(hit.path) ; model.query = "" }
+                if f.hasNotes { Button("Show notes") { model.showNotes(f) } }
                 Button("Edit…") { model.sheet = .editFolder(f) }
             }
             Button("Show in place") { model.showInPlace(hit) }

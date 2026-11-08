@@ -288,6 +288,11 @@ final class AppModel: ObservableObject {
         guard let id = focusId, keyboardRows.contains(id) else { return nil }
         return library.bookmark(id)
     }
+    /// the focused row's directory, if it is one
+    var focusedFolder: Folder? {
+        guard let id = focusId, keyboardRows.contains(id) else { return nil }
+        return library.folder(id)
+    }
     /// Return: a bookmark opens (a secret-only one shows its secret), a directory is opened on the page.
     func activateFocus() {
         guard let id = focusId, keyboardRows.contains(id) else { return }
@@ -301,8 +306,12 @@ final class AppModel: ObservableObject {
     }
     /// Space: the focused bookmark's secret, when it has one.
     func showFocusedSecret() { if let b = focusedBookmark, b.hasSecret { showSecret(b) } }
-    /// ⇧Space: the focused bookmark's notes, when it has some.
-    func showFocusedNotes() { if let b = focusedBookmark, b.hasNotes { showNotes(b) } }
+    /// ⇧Space: the focused bookmark's (or directory's) notes, when it has some.
+    func showFocusedNotes() {
+        if let b = focusedBookmark, b.hasNotes { showNotes(b) }
+        else if let f = focusedFolder, f.hasNotes { showNotes(f) }
+    }
+    var focusedHasNotes: Bool { (focusedBookmark?.hasNotes ?? false) || (focusedFolder?.hasNotes ?? false) }
     /// ⌘L: the focused bookmark's address (a secret-only one has none).
     func copyFocusedAddress() { if let b = focusedBookmark, !b.isSecretOnly { copyAddress(b) } }
     /// ⌘↑: the directory above, with the one just left under the arrow keys.
@@ -529,15 +538,18 @@ final class AppModel: ObservableObject {
 
     // MARK: directories
 
-    func addFolder(name: String, description: String, colorId: UUID?, in path: FolderPath) {
-        if change("The directory wasn't made", { _ = try $0.addFolder(name: name, description: description, colorId: colorId, in: path) }), !path.isTabRoot {
+    func addFolder(name: String, description: String, colorId: UUID?, hasNotes: Bool = false, notes: String = "", in path: FolderPath) {
+        if change("The directory wasn't made", { _ = try $0.addFolder(name: name, description: description, colorId: colorId, hasNotes: hasNotes, notes: notes, in: path) }), !path.isTabRoot {
             setExpanded(path.folderId, true)   // the new directory can be seen in the tree
         }
     }
-    func updateFolder(_ id: UUID, name: String, description: String, colorId: UUID?) {
-        change("The directory wasn't saved") { try $0.updateFolder(id, name: name, description: description, colorId: colorId) }
+    /// nil for `hasNotes` / `notes` leaves the directory's notes as they are
+    func updateFolder(_ id: UUID, name: String, description: String, colorId: UUID?, hasNotes: Bool? = nil, notes: String? = nil) {
+        if change("The directory wasn't saved", { try $0.updateFolder(id, name: name, description: description, colorId: colorId, hasNotes: hasNotes, notes: notes) }) {
+            if let f = library.folder(id) { NotesWindows.refresh(folder: f) }
+        }
     }
-    func deleteFolder(_ id: UUID) { change("The directory wasn't deleted") { try $0.deleteFolder(id) } }
+    func deleteFolder(_ id: UUID) { NotesWindows.close(id); change("The directory wasn't deleted") { try $0.deleteFolder(id) } }
     func sortByName(_ path: FolderPath) { change { $0.sortByName(at: path) } }
 
     // MARK: bookmarks
@@ -559,22 +571,43 @@ final class AppModel: ObservableObject {
     // MARK: notes (Matt, Nov 8 2026): plain text for yourself, in a window of its own, never hidden by itself
 
     func showNotes(_ b: Bookmark) { NotesWindows.show(b, model: self) }
+    /// a directory's notes (Matt, Nov 8 2026): the same window
+    func showNotes(_ f: Folder) { NotesWindows.show(folder: f, model: self) }
+    /// The bookmark's or directory's notes as the window shows them, from the library as it is now.
+    func notesItem(_ id: UUID) -> NotesItem? {
+        if let b = library.bookmark(id) { return NotesItem(b) }
+        if let f = library.folder(id) { return NotesItem(f) }
+        return nil
+    }
     /// Save from the notes window: the text as typed; the library stamps the date when it changed.
     @discardableResult
     func saveNotes(_ id: UUID, _ text: String) -> Bool {
-        guard var b = library.bookmark(id) else { notice = Notice(title: "The notes weren't saved", message: "That bookmark is gone."); return false }
-        b.hasNotes = true; b.notes = text
-        guard change("The notes weren't saved", { try $0.updateBookmark(b) }) else { return false }
-        if let saved = library.bookmark(id) { NotesWindows.refresh(saved) }
+        if var b = library.bookmark(id) {
+            b.hasNotes = true; b.notes = text
+            guard change("The notes weren't saved", { try $0.updateBookmark(b) }) else { return false }
+        } else if let f = library.folder(id) {
+            guard change("The notes weren't saved", { try $0.updateFolder(id, name: f.name, description: f.description, colorId: f.colorId, hasNotes: true, notes: text) }) else { return false }
+        } else { notice = Notice(title: "The notes weren't saved", message: "That bookmark or directory is gone."); return false }
+        if let saved = notesItem(id) { NotesWindows.refresh(saved) }
         return true
     }
-    /// Delete notes… (asked first, in the window): the bookmark stays, its notes are turned off — the row loses
-    /// its Notes button until the editor turns them on again (Matt).
+    /// Delete notes… (asked first, in the window): the bookmark or directory stays, its notes are turned off —
+    /// the row loses its Notes button until the editor turns them on again (Matt).
     func deleteNotes(_ id: UUID) {
-        guard var b = library.bookmark(id) else { return }
-        b.hasNotes = false; b.notes = ""
         NotesWindows.close(id)
-        change("The notes weren't deleted") { try $0.updateBookmark(b) }
+        if var b = library.bookmark(id) {
+            b.hasNotes = false; b.notes = ""
+            change("The notes weren't deleted") { try $0.updateBookmark(b) }
+        } else if let f = library.folder(id) {
+            change("The notes weren't deleted") { try $0.updateFolder(id, name: f.name, description: f.description, colorId: f.colorId, hasNotes: false, notes: "") }
+        }
+    }
+    /// The notes window's Show directory: the directory opens in the main window.
+    func revealFolder(_ id: UUID) {
+        guard let p = library.path(toFolder: id) else { return }
+        query = ""
+        select(p)
+        NSApp.windows.first { $0.identifier?.rawValue == "main" }?.makeKeyAndOrderFront(nil)
     }
     /// An address clicked inside the notes: the browser from Settings, like a bookmark.
     func openLinkFromNotes(_ u: URL) {
@@ -662,9 +695,11 @@ final class AppModel: ObservableObject {
         library = lib
         guard save() else { library = old; fixSelection(); return [] }
         // open secret windows: closed for bookmarks that are gone, brought up to date for the rest (a replace keeps ids)
-        let stillThere = Set(lib.allBookmarks.map(\.id))
+        let stillThere = Set(lib.allBookmarks.map(\.id)), foldersThere = Set(lib.allFolders.map(\.id))
         for id in old.allBookmarks.map(\.id) where !stillThere.contains(id) { SecretWindows.close(id); NotesWindows.close(id) }
+        for id in old.allFolders.map(\.id) where !foldersThere.contains(id) { NotesWindows.close(id) }
         for b in lib.allBookmarks { SecretWindows.refresh(b); NotesWindows.refresh(b) }
+        for f in lib.allFolders { NotesWindows.refresh(folder: f) }
         if mode == .replace { selectTab(library.tabs[0].id) }
         // icons are fetched as rows come into view — not all at once here
         return notes

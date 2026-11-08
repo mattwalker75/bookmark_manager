@@ -265,6 +265,7 @@ struct FolderEditor: View {
     @State private var folder: Folder
     @State private var problem: String?
     @State private var confirmDelete = false
+    @State private var confirmDeleteNotes = false
 
     init(folder: Folder?, path: FolderPath) {
         isNew = folder == nil
@@ -283,6 +284,17 @@ struct FolderEditor: View {
                 Field("Name", $folder.name, "Self-hosted apps")
                 Field("Description", $folder.description, "Optional — shown under the name")
                 LabeledContent("Color") { ColorPills(selection: $folder.colorId) }
+                Section {
+                    // notes on a directory (Matt, Nov 8 2026): switched on and off like a bookmark's; off with text asks first
+                    Toggle("This \(Library.levelName(level)) has notes", isOn: Binding(get: { folder.hasNotes }, set: { on in
+                        if !on, !folder.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { confirmDeleteNotes = true } else { folder.hasNotes = on }
+                    }))
+                    if folder.hasNotes {
+                        TextBox(text: $folder.notes, placeholder: "the project's status, what lives where — as many lines as you like", minLines: 3, maxLines: 6, label: "The notes", monospaced: false)
+                        Text("Plain notes for yourself. Not a secret: kept as they are, always in exports and backups, found by the search; the Notes button on the row opens them in a window of their own.")
+                            .font(DS.secondary).foregroundStyle(.secondary)
+                    }
+                }
                 if let problem { Text(problem).font(DS.secondary).foregroundStyle(Theme.problem) }
             }
             .formStyle(.grouped)
@@ -293,21 +305,25 @@ struct FolderEditor: View {
                 Button(isNew ? "Add \(Library.levelName(level))" : "Save") { save() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
             }
         }
-        .padding(20).frame(width: 520, height: 340)
+        .padding(20).frame(width: 560, height: folder.hasNotes ? 560 : 400)
         .confirmationDialog("Delete the \(Library.levelName(level)) “\(folder.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete") { model.deleteFolder(folder.id); dismiss() }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: { Text("It is empty, so nothing else is lost.") }
+        .confirmationDialog("Delete the notes for “\(folder.name)”?", isPresented: $confirmDeleteNotes, titleVisibility: .visible) {
+            Button("Delete notes") { folder.hasNotes = false; folder.notes = "" }
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+        } message: { Text("Turning the notes off throws the text away when you save. The \(Library.levelName(level)) itself stays.") }
     }
 
     private func save() {
         var trial = model.library
         do {
-            if isNew { _ = try trial.addFolder(name: folder.name, description: folder.description, colorId: folder.colorId, in: path) }
-            else { try trial.updateFolder(folder.id, name: folder.name, description: folder.description, colorId: folder.colorId) }
+            if isNew { _ = try trial.addFolder(name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: folder.hasNotes, notes: folder.notes, in: path) }
+            else { try trial.updateFolder(folder.id, name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: folder.hasNotes, notes: folder.notes) }
         } catch { problem = (error as? BMError)?.message ?? error.localizedDescription; return }
-        if isNew { model.addFolder(name: folder.name, description: folder.description, colorId: folder.colorId, in: path) }
-        else { model.updateFolder(folder.id, name: folder.name, description: folder.description, colorId: folder.colorId) }
+        if isNew { model.addFolder(name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: folder.hasNotes, notes: folder.notes, in: path) }
+        else { model.updateFolder(folder.id, name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: folder.hasNotes, notes: folder.notes) }
         dismiss()
     }
 

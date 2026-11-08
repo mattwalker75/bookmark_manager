@@ -55,7 +55,7 @@ struct MainWindow: View {
     }
 
     /// Development only, harmless when unset (for trying screens on a scratch BOOKMARKMANAGER_HOME):
-    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|notes[:<name prefix>]|notesedit:<name prefix>|edit:<name prefix>|duplicates|search:<text>|textsize:<points>|settings[:tab[:end]]
+    /// BOOKMARKMANAGER_AUTOSHEET=newBookmark|newSecret|editBookmark|newFolder|editFolder|newTab|move|secret|notes[:<name prefix>]|notesedit:<name prefix>|edit:<name prefix>|editdir:<name prefix>|duplicates|search:<text>|textsize:<points>|settings[:tab[:end]]
     private func developmentHooks() {
         guard let hooks = ProcessInfo.processInfo.environment["BOOKMARKMANAGER_AUTOSHEET"] else { return }
         // several steps separated by ";" run a second apart: "search:admin;keys:125,125,36"
@@ -98,7 +98,12 @@ struct MainWindow: View {
                 if sheet.hasSuffix(":sheet") { model.sheet = .linkReport }
             default:
                 if sheet.hasPrefix("secret:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(7))) }) { model.showSecret(b) }
-                if sheet.hasPrefix("notes:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(6))) }) { model.showNotes(b) }
+                if sheet.hasPrefix("notes:") {   // a bookmark's notes, or a directory's
+                    let p = String(sheet.dropFirst(6))
+                    if let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(p) }) { model.showNotes(b) }
+                    else if let f = model.library.allFolders.first(where: { $0.name.hasPrefix(p) }) { model.showNotes(f) }
+                }
+                if sheet.hasPrefix("editdir:"), let f = model.library.allFolders.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(8))) }) { model.sheet = .editFolder(f) }
                 if sheet.hasPrefix("notesedit:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(10))) }) { model.showNotes(b); NotesWindows.holder(b.id)?.beginEdit() }
                 if sheet.hasPrefix("edit:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(5))) }) { model.sheet = .editBookmark(b) }
                 if sheet.hasPrefix("search:") { model.query = String(sheet.dropFirst(7)) }
@@ -166,10 +171,10 @@ enum KeyboardDriver {
         case 36, 76:                                 // Return, Enter
             guard model.focusId != nil else { return false }
             model.activateFocus(); return true
-        case 49:                                     // Space (⇧Space: the notes)
-            guard !inSearch, let b = model.focusedBookmark else { return false }
-            if e.modifierFlags.contains(.shift) { guard b.hasNotes else { return false }; model.showNotes(b); return true }
-            guard b.hasSecret else { return false }
+        case 49:                                     // Space (⇧Space: the notes — a bookmark's or a directory's)
+            guard !inSearch else { return false }
+            if e.modifierFlags.contains(.shift) { guard model.focusedHasNotes else { return false }; model.showFocusedNotes(); return true }
+            guard let b = model.focusedBookmark, b.hasSecret else { return false }
             model.showSecret(b); return true
         default: return false
         }
@@ -410,6 +415,7 @@ struct TreeRow: View {
         } isTargeted: { targeted = $0 }
         .contextMenu {
             Button("Open") { model.select(path) }
+            if folder.hasNotes { Button("Show notes") { model.showNotes(folder) } }
             if depth > 0, hasChildren { Button(expanded ? "Hide sub-directories" : "Show sub-directories") { model.toggleExpanded(folder.id) } }
             if path.depth + 1 <= model.library.maxDepth { Button("New directory inside…") { model.sheet = .newFolder(path) } }
             Button("New bookmark here…") { model.sheet = .newBookmark(path) }
@@ -569,6 +575,10 @@ struct SubfolderRow: View {
                 if !folder.description.isEmpty { Text(folder.description).font(DS.secondary).foregroundStyle(.secondary).lineLimit(2) }
             }
             Spacer()
+            if folder.hasNotes {
+                Button { model.showNotes(folder) } label: { Label("Notes", systemImage: "doc.text").font(DS.secondary) }
+                    .buttonStyle(.bordered).controlSize(.small).help("Show the directory's notes in their own window")
+            }
             Text(count).font(DS.secondary).foregroundStyle(.secondary)
             Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.tertiary)
         }
@@ -589,6 +599,7 @@ struct SubfolderRow: View {
         } isTargeted: { targeted = $0 }
         .contextMenu {
             Button("Open") { model.select(path) }
+            if folder.hasNotes { Button("Show notes") { model.showNotes(folder) } }
             Button("Edit…") { model.sheet = .editFolder(folder) }
             Button("Move to…") { model.sheet = .move(.folder(folder.id)) }
             Button("Check links in this directory…") { model.checkLinks(in: path) }.disabled(model.linkCheckRunning)

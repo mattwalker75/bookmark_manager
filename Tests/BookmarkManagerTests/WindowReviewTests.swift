@@ -43,7 +43,7 @@ final class WindowReviewTests: XCTestCase {
 
     func testShowInPlaceLandsTheRowUnderTheArrowKeys() throws {
         let m = model()
-        let hit = try XCTUnwrap(m.library.search("tailscale").first)
+        let hit = try XCTUnwrap(m.library.search("tailscale").first { !$0.isFolder })   // the sample's directory notes mention Tailscale too
         m.showInPlace(hit)
         XCTAssertEqual(m.focusId, hit.id)
         XCTAssertEqual(m.highlightId, hit.id)

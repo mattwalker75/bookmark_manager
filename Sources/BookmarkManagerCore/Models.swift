@@ -129,12 +129,18 @@ public struct Folder: Codable, Equatable, Identifiable, Sendable {
     public var colorId: UUID?
     public var folders: [Folder]
     public var bookmarks: [Bookmark]
+    /// notes on a directory (Matt, Nov 8 2026): the same plain notes a bookmark can have — a project's status,
+    /// what is where. Never a secret; in library.json and every export; shown by the row's Notes button
+    public var hasNotes: Bool
+    public var notes: String
+    public var notesEditedAt: Date?
 
-    public init(id: UUID = UUID(), name: String, description: String = "", colorId: UUID? = nil, folders: [Folder] = [], bookmarks: [Bookmark] = []) {
+    public init(id: UUID = UUID(), name: String, description: String = "", colorId: UUID? = nil, folders: [Folder] = [], bookmarks: [Bookmark] = [], hasNotes: Bool = false, notes: String = "", notesEditedAt: Date? = nil) {
         self.id = id; self.name = name; self.description = description; self.colorId = colorId; self.folders = folders; self.bookmarks = bookmarks
+        self.hasNotes = hasNotes; self.notes = notes; self.notesEditedAt = notesEditedAt
     }
 
-    enum CodingKeys: String, CodingKey { case id, name, description, colorId, folders, bookmarks }
+    enum CodingKeys: String, CodingKey { case id, name, description, colorId, folders, bookmarks, hasNotes, notes, notesEditedAt }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
@@ -143,6 +149,9 @@ public struct Folder: Codable, Equatable, Identifiable, Sendable {
         colorId = try c.decodeIfPresent(UUID.self, forKey: .colorId)
         folders = try c.decodeIfPresent([Folder].self, forKey: .folders) ?? []
         bookmarks = try c.decodeIfPresent([Bookmark].self, forKey: .bookmarks) ?? []
+        hasNotes = (try? c.decodeIfPresent(Bool.self, forKey: .hasNotes)) ?? false
+        notes = (try? c.decodeIfPresent(String.self, forKey: .notes)) ?? ""
+        notesEditedAt = try? c.decodeIfPresent(Date.self, forKey: .notesEditedAt)
     }
 
     /// Nothing in it at all — the only state a folder or tab can be deleted in.
@@ -322,21 +331,29 @@ public struct Library: Codable, Equatable, Sendable {
 
     // MARK: folders
 
-    /// Adds a directory (or sub-directory) inside the folder at `path`, as deep as `maxDepth` allows.
+    /// Adds a directory (or sub-directory) inside the folder at `path`, as deep as `maxDepth` allows. Notes typed get their date.
     @discardableResult
-    public mutating func addFolder(name: String, description: String = "", colorId: UUID? = nil, in path: FolderPath) throws -> UUID {
+    public mutating func addFolder(name: String, description: String = "", colorId: UUID? = nil, hasNotes: Bool = false, notes: String = "", in path: FolderPath, now: Date = Date()) throws -> UUID {
         let n = try Library.cleanName(name, what: "directory")
         guard folder(at: path) != nil else { throw BMError("The directory it was going into is gone.") }
         try checkDepth(path.depth + 1, placing: Library.levelName(path.depth + 1))
-        let f = Folder(name: n, description: description.trimmingCharacters(in: .whitespacesAndNewlines), colorId: colorId)
+        let f = Folder(name: n, description: description.trimmingCharacters(in: .whitespacesAndNewlines), colorId: colorId,
+                       hasNotes: hasNotes, notes: hasNotes ? notes : "", notesEditedAt: hasNotes && !notes.isEmpty ? now : nil)
         modify(at: path) { $0.folders.append(f) }
         return f.id
     }
 
-    public mutating func updateFolder(_ id: UUID, name: String, description: String, colorId: UUID?) throws {
+    /// Saves a directory's name, description and color; its notes too when `hasNotes` / `notes` are given (nil
+    /// leaves them as they are). Notes whose text changed get the date (`now`); notes switched off are dropped.
+    public mutating func updateFolder(_ id: UUID, name: String, description: String, colorId: UUID?, hasNotes: Bool? = nil, notes: String? = nil, now: Date = Date()) throws {
         let n = try Library.cleanName(name, what: "directory")
         guard let p = path(toFolder: id) else { throw BMError("That directory is gone.") }
-        modify(at: p) { $0.name = n; $0.description = description.trimmingCharacters(in: .whitespacesAndNewlines); $0.colorId = colorId }
+        modify(at: p) { f in
+            f.name = n; f.description = description.trimmingCharacters(in: .whitespacesAndNewlines); f.colorId = colorId
+            if let hasNotes { f.hasNotes = hasNotes }
+            if let notes, f.hasNotes, notes != f.notes { f.notes = notes; f.notesEditedAt = now }
+            if !f.hasNotes { f.notes = ""; f.notesEditedAt = nil }
+        }
     }
 
     /// A directory goes only when it is empty (Matt: so a full one is never deleted by accident).

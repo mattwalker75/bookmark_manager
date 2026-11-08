@@ -144,6 +144,7 @@ public enum Transfer {
         if !ids.insert(f.id).inserted { r.problems.append(Problem(place: where_, text: "Its id is used twice in the file.", stops: true)) }
         if level > lib.maxDepth { r.problems.append(Problem(place: where_, text: "This \(what) is \(level) levels deep, but the file allows \(lib.maxDepth).", stops: true)) }
         if let c = f.colorId, !colorIds.contains(c) { r.problems.append(Problem(place: where_, text: "Its color code isn't in the file; the color is cleared when importing.", stops: false)) }
+        if !f.hasNotes, !f.notes.isEmpty { r.problems.append(Problem(place: where_, text: "It has notes but isn't marked as having notes; the notes are dropped when importing.", stops: false)) }
         for b in f.bookmarks {
             r.bookmarks += 1
             let bw = (here + [b.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "(no name)" : b.name]).joined(separator: " › ")
@@ -233,6 +234,7 @@ public enum Transfer {
     }
     private static func tidy(_ f: inout Folder, _ colors: Set<UUID>) {
         if let c = f.colorId, !colors.contains(c) { f.colorId = nil }
+        if !f.hasNotes { f.notes = ""; f.notesEditedAt = nil }
         for i in f.bookmarks.indices {
             if let c = f.bookmarks[i].colorId, !colors.contains(c) { f.bookmarks[i].colorId = nil }
             if !f.bookmarks[i].hasSecret { f.bookmarks[i].secret = "" }
