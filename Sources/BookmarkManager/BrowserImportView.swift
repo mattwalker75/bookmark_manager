@@ -78,7 +78,9 @@ struct BrowserImportSheet: View {
         // the refusal (a blank name) is shown here, in the sheet, not as a notice behind it
         do { _ = try Transfer.importBrowser(file, tabName: tabName, into: model.library) }
         catch { problem = (error as? BMError)?.message ?? error.localizedDescription; return }
-        let notes = model.importBrowser(file, tabName: tabName)
+        // nil: it didn't happen (the save failed, say) — the notice behind the sheet says why, so the sheet goes
+        // away and the Settings pane is NOT told it was imported
+        guard let notes = model.importBrowser(file, tabName: tabName) else { dismiss(); return }
         done(notes)
         dismiss()
     }

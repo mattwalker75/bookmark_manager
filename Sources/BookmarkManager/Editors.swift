@@ -309,7 +309,7 @@ struct FolderEditor: View {
         .confirmationDialog("Delete the \(Library.levelName(level)) “\(folder.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete") { model.deleteFolder(folder.id); dismiss() }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-        } message: { Text("It is empty, so nothing else is lost.") }
+        } message: { Text((model.library.folder(folder.id) ?? folder).emptyDeleteMessage) }
         .confirmationDialog("Delete the notes for “\(folder.name)”?", isPresented: $confirmDeleteNotes, titleVisibility: .visible) {
             Button("Delete notes") { folder.hasNotes = false; folder.notes = "" }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
@@ -414,5 +414,15 @@ struct MoveSheet: View {
         }
         .padding(20).frame(width: 500)
         .onAppear { if let c = current { destination = c } }
+    }
+}
+
+extension Folder {
+    /// The message under "Delete the directory …?" for a directory with nothing inside it. It may still carry notes
+    /// (Matt, Nov 8 2026) — those go with it, and the dialog says so instead of calling it empty.
+    var emptyDeleteMessage: String {
+        hasNotes && !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "It has no bookmarks or directories inside it, but it has notes — they are deleted with it."
+            : "It is empty, so nothing else is lost."
     }
 }

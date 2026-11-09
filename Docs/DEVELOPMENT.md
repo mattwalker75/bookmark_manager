@@ -22,7 +22,7 @@ icon/                          icon.svg (Tabbed folder) → make_icns.sh → Boo
 ## Build and test
 ```bash
 swift build          # debug build of everything
-swift test           # 151 tests, under a minute
+swift test           # 153 tests, under a minute
 ./BUILD_APP.sh       # build/Bookmark Manager.app (release, ad-hoc signed)
 ```
 
@@ -62,7 +62,8 @@ it is still the fitted size; the View menu items do the same for the key window 
 counted; empty folders pruned and counted; the top folder names guess the browser) into a `File`; `makeTab`
 builds one `Folder` (fresh ids), folding folders deeper than `maxLevels` into the directory above;
 `Transfer.importBrowser` raises `maxDepth` to fit (up to 6) and appends the tab. `BrowserImportSheet` shows the
-counts and the levels sentence; `AppModel.importBrowser` saves and selects the tab.
+counts and the levels sentence; `AppModel.importBrowser` saves and selects the tab (nil = it did not happen; a notice
+says why, and the sheet closes without telling the pane it was imported).
 
 Site icons: `IconCache.image(for:fetch:)` answers from memory or `<home>/icons/<host>.png`, else queues one fetch
 (at most `atOnce` = 4 running; `IconFetcher`: the site ROOT's HTML — never the bookmark's path — →

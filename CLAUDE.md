@@ -53,6 +53,8 @@ it is not a developer: every message is a plain sentence.
     count reads "3 · 2 dirs". The tab's top level always lists its directories.
 3. **Delete only when empty:** a tab, directory or sub-directory with anything in it is refused with a sentence
    naming what is inside. Deleting a bookmark asks first (confirm buttons have no destructive role, Cancel is default).
+   Notes do not make a directory "full": it is deletable, and the dialog says the notes go with it
+   (`Folder.emptyDeleteMessage`). An item's secret/notes windows close only AFTER a delete went through (1.2.1).
 4. **Order is manual** (drag and drop, Move to…); "Sort by name" sorts one directory once. Drop rules live in
    `Arrange.swift` only; views just report drops (`AppModel.drop`). A directory dropped on a bookmark row goes into that
    row's directory; a bookmark dropped on a row lands before it; tabs reorder by dragging along the tab bar.

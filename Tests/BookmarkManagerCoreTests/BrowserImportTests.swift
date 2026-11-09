@@ -146,6 +146,52 @@ final class BrowserImportTests: XCTestCase {
         XCTAssertThrowsBM(try Transfer.importBrowser(f, tabName: "  ", into: fits), containing: "needs a name")
     }
 
+    /// 1.2.1: a description after a link that was left out (a bookmarklet, say) is dropped, not hung on the kept
+    /// link before it; a file of folders alone — an export with no links — reads, and the counts speak.
+    func testADescriptionAfterASkippedLinkAndAFoldersOnlyFile() throws {
+        let html = """
+        <!DOCTYPE NETSCAPE-Bookmark-file-1>
+        <DL><p>
+            <DT><A HREF="https://kept.example/">Kept</A>
+            <DT><A HREF="javascript:void(0)">Bookmarklet</A>
+            <DD>About the bookmarklet
+            <DT><A HREF="https://second.example/">Second</A>
+            <DD>About the second
+            <DT><H3>Folder</H3>
+            <DD>About the folder
+            <DL><p>
+                <DT><A HREF="https://inside.example/">Inside</A>
+            </DL><p>
+            <DD>A stray description after the list
+        </DL><p>
+        """
+        let f = try BrowserBookmarks.parse(Data(html.utf8))
+        XCTAssertEqual(f.root.links.map(\.name), ["Kept", "Second"]); XCTAssertEqual(f.skipped, 1)
+        XCTAssertEqual(f.root.links[0].description, "", "the bookmarklet's description does not land on Kept")
+        XCTAssertEqual(f.root.links[1].description, "About the second")
+        XCTAssertEqual(f.root.folders[0].description, "About the folder")
+        XCTAssertEqual(f.root.folders[0].links[0].description, "", "a description after a closed list goes nowhere")
+        // folders only: no <A> anywhere, still a bookmarks file
+        let foldersOnly = """
+        <!DOCTYPE NETSCAPE-Bookmark-file-1>
+        <TITLE>Bookmarks</TITLE>
+        <DL><p>
+            <DT><H3 PERSONAL_TOOLBAR_FOLDER="true">Bookmarks bar</H3>
+            <DL><p>
+                <DT><H3>Work</H3>
+                <DL><p></DL><p>
+            </DL><p>
+            <DT><H3>Other bookmarks</H3>
+            <DL><p></DL><p>
+        </DL><p>
+        """
+        let fo = try BrowserBookmarks.parse(Data(foldersOnly.utf8))
+        XCTAssertEqual(fo.bookmarks, 0); XCTAssertEqual(fo.folders, 0, "folders with nothing in them are left out")
+        XCTAssertEqual(fo.emptyFolders, 3); XCTAssertNil(fo.browser, "the browser is told from the folders that came in, and none did")
+        // and a page that merely has a definition list in it is still not one
+        XCTAssertThrowsBM(try BrowserBookmarks.parse(Data("<html><body><dl><dt>Term</dt><dd>Meaning</dd></dl></body></html>".utf8)), containing: "doesn't look like")
+    }
+
     func testTheSmallPieces() {
         XCTAssertEqual(BrowserBookmarks.decode("a &amp; b &lt;c&gt; &quot;d&quot; &#39;e&#39; &#x263A; &#9731; &unknown; & plain"), "a & b <c> \"d\" 'e' ☺ ☃ &unknown; & plain")
         XCTAssertEqual(BrowserBookmarks.cleanLine("  two\n   words \t here "), "two words here")

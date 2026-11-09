@@ -254,7 +254,7 @@ struct TabBar: View {
         .confirmationDialog("Delete the tab “\(tabToDelete?.name ?? "")”?", isPresented: Binding(get: { tabToDelete != nil }, set: { if !$0 { tabToDelete = nil } }), titleVisibility: .visible) {
             Button("Delete tab") { if let t = tabToDelete { model.deleteTab(t.id) }; tabToDelete = nil }
             Button("Cancel", role: .cancel) { tabToDelete = nil }.keyboardShortcut(.defaultAction)
-        } message: { Text("It is empty, so nothing else is lost.") }
+        } message: { Text(tabToDelete?.emptyDeleteMessage ?? "") }
     }
 }
 
@@ -441,7 +441,7 @@ struct TreeRow: View {
         .confirmationDialog("Delete the \(Library.levelName(depth)) “\(folder.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete") { model.deleteFolder(folder.id) }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-        } message: { Text("It is empty, so nothing else is lost.") }
+        } message: { Text(folder.emptyDeleteMessage) }
     }
 
     private var background: Color {
@@ -616,7 +616,7 @@ struct SubfolderRow: View {
         .confirmationDialog("Delete the \(Library.levelName(path.depth)) “\(folder.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete") { model.deleteFolder(folder.id) }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-        } message: { Text("It is empty, so nothing else is lost.") }
+        } message: { Text(folder.emptyDeleteMessage) }
     }
 
     private var count: String {

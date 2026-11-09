@@ -549,7 +549,9 @@ final class AppModel: ObservableObject {
             if let f = library.folder(id) { NotesWindows.refresh(folder: f) }
         }
     }
-    func deleteFolder(_ id: UUID) { NotesWindows.close(id); change("The directory wasn't deleted") { try $0.deleteFolder(id) } }
+    /// the notes window goes only once the directory is gone — a refused delete (it isn't empty) leaves it, and
+    /// whatever is being typed in it, alone
+    func deleteFolder(_ id: UUID) { if change("The directory wasn't deleted", { try $0.deleteFolder(id) }) { NotesWindows.close(id) } }
     func sortByName(_ path: FolderPath) { change { $0.sortByName(at: path) } }
 
     // MARK: bookmarks
@@ -564,8 +566,7 @@ final class AppModel: ObservableObject {
         }
     }
     func deleteBookmark(_ id: UUID) {
-        SecretWindows.close(id); NotesWindows.close(id)
-        change { $0.deleteBookmark(id) }
+        if change("The bookmark wasn't deleted", { $0.deleteBookmark(id) }) { SecretWindows.close(id); NotesWindows.close(id) }
     }
 
     // MARK: notes (Matt, Nov 8 2026): plain text for yourself, in a window of its own, never hidden by itself
@@ -706,14 +707,15 @@ final class AppModel: ObservableObject {
     }
 
     /// Import from a browser's bookmarks file (Matt, Nov 8 2026): its folders and links come in as a new tab, which
-    /// is then shown. The sentences are for the Settings pane; a refusal is a notice.
-    func importBrowser(_ file: BrowserBookmarks.File, tabName: String) -> [String] {
+    /// is then shown. The sentences are for the Settings pane; nil = nothing was imported, and a notice says why
+    /// (a refusal, or a save that failed).
+    func importBrowser(_ file: BrowserBookmarks.File, tabName: String) -> [String]? {
         let result: (library: Library, notes: [String], tabId: UUID)
         do { result = try Transfer.importBrowser(file, tabName: tabName, into: library) }
-        catch { notice = Notice(title: "Nothing was imported", message: (error as? BMError)?.message ?? error.localizedDescription); return [] }
+        catch { notice = Notice(title: "Nothing was imported", message: (error as? BMError)?.message ?? error.localizedDescription); return nil }
         let old = library
         library = result.library
-        guard save() else { library = old; fixSelection(); return [] }
+        guard save() else { library = old; fixSelection(); return nil }
         selectTab(result.tabId)   // icons are fetched as rows come into view, like any import
         return result.notes
     }

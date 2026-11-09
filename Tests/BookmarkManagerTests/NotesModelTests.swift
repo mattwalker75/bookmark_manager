@@ -78,6 +78,38 @@ final class NotesModelTests: XCTestCase {
         XCTAssertNil(m.notice)
     }
 
+    /// 1.2.1: deleting a directory closes its notes window only once the directory is gone — a refused delete
+    /// (it isn't empty) leaves the window, and what is being typed in it, alone. The delete dialog's message
+    /// knows a directory that holds nothing but notes.
+    func testARefusedDeleteLeavesTheNotesWindowAlone() throws {
+        let m = model()
+        let dir = try XCTUnwrap(m.library.allFolders.first { $0.name == "Self-hosted apps" })
+        XCTAssertFalse(dir.isEmpty, "the sample directory has bookmarks in it")
+        NotesWindows.show(folder: dir, model: m)
+        XCTAssertTrue(NotesWindows.isOpen(dir.id))
+        let holder = try XCTUnwrap(NotesWindows.holder(dir.id))
+        holder.editing = true; holder.draft = dir.notes + "\nHalf a thought"
+        XCTAssertTrue(holder.isDirty)
+        m.deleteFolder(dir.id)
+        XCTAssertEqual(m.notice?.title, "The directory wasn't deleted")
+        XCTAssertNotNil(m.library.folder(dir.id))
+        XCTAssertTrue(NotesWindows.isOpen(dir.id), "the window stays"); XCTAssertEqual(NotesWindows.holder(dir.id)?.draft, holder.draft, "and so does the draft")
+        holder.editing = false; holder.draft = dir.notes
+        NotesWindows.close(dir.id)
+        // a directory with nothing but notes: deletable, and the dialog says the notes go with it
+        m.notice = nil
+        m.addFolder(name: "Notes only", description: "", colorId: nil, hasNotes: true, notes: "Just a thought.", in: FolderPath(tab: m.library.tabs[0].id))
+        let only = try XCTUnwrap(m.library.allFolders.first { $0.name == "Notes only" })
+        XCTAssertTrue(only.isEmpty, "nothing inside it, so the Delete… button asks first")
+        XCTAssertEqual(only.emptyDeleteMessage, "It has no bookmarks or directories inside it, but it has notes — they are deleted with it.")
+        XCTAssertEqual(Folder(name: "Plain").emptyDeleteMessage, "It is empty, so nothing else is lost.")
+        NotesWindows.show(folder: only, model: m)
+        XCTAssertTrue(NotesWindows.isOpen(only.id))
+        m.deleteFolder(only.id)
+        XCTAssertNil(m.library.folder(only.id)); XCTAssertNil(m.notice)
+        XCTAssertFalse(NotesWindows.isOpen(only.id), "gone with the directory")
+    }
+
     func testTheKeyboardAndTheSearchReachNotes() throws {
         let m = model()
         let pm = try XCTUnwrap(m.library.allBookmarks.first { $0.name == "People Manager" })

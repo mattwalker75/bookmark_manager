@@ -59,7 +59,9 @@ public enum BrowserBookmarks {
             throw BMError("That file couldn't be read as text.")
         }
         let lower = text.lowercased()
-        guard lower.contains("<dl"), lower.contains("<a "), lower.contains("netscape-bookmark") || lower.contains("<dt") else {
+        // the shape every browser writes: a DL of DTs (links, or folders as H3). A file of folders alone — an export
+        // with no links in it — is still that shape; it reads, and the counts say what is in it.
+        guard lower.contains("<dl"), lower.contains("<dt"), lower.contains("netscape-bookmark") || lower.contains("<a ") || lower.contains("<h3") else {
             throw BMError("That file doesn't look like a browser's bookmarks file (the HTML one a browser exports). " + howToExport)
         }
         var root = Node(name: "Bookmarks")
@@ -67,6 +69,9 @@ public enum BrowserBookmarks {
         var dlPushed: [Bool] = []
         var pendingFolder: Node?
         var skipped = 0
+        /// a DD describes the link (or folder) just before it — but only a link that was kept; one after a skipped
+        /// link (a bookmarklet, say) must not land on the kept link before that
+        var lastLinkKept = false
         enum Capture { case none, h3, a(href: String, tags: [String], description: String), dd }
         var capture = Capture.none
         var buffer = ""
@@ -78,7 +83,7 @@ public enum BrowserBookmarks {
             let d = cleanLine(s)
             guard !d.isEmpty else { return }
             if pendingFolder != nil { pendingFolder!.description = d }
-            else if !stack[stack.count - 1].links.isEmpty { stack[stack.count - 1].links[stack[stack.count - 1].links.count - 1].description = d }
+            else if lastLinkKept, !stack[stack.count - 1].links.isEmpty { stack[stack.count - 1].links[stack[stack.count - 1].links.count - 1].description = d }
         }
         for token in tokens(text) {
             switch token {
@@ -93,15 +98,16 @@ public enum BrowserBookmarks {
             case .tag(let name, let closing, let attrs):
                 switch (name, closing) {
                 case ("h3", false):
-                    settlePending(); capture = .h3; buffer = ""
+                    settlePending(); lastLinkKept = false; capture = .h3; buffer = ""
                 case ("h3", true):
                     let n = cleanLine(buffer)
                     pendingFolder = Node(name: n.isEmpty ? "Untitled folder" : n)
                     capture = .none
                 case ("dl", false):
+                    lastLinkKept = false
                     if let p = pendingFolder { stack.append(p); pendingFolder = nil; dlPushed.append(true) } else { dlPushed.append(false) }
                 case ("dl", true):
-                    settlePending()
+                    settlePending(); lastLinkKept = false
                     if dlPushed.popLast() == true, stack.count > 1 {
                         let done = stack.removeLast()
                         stack[stack.count - 1].folders.append(done)
@@ -118,7 +124,8 @@ public enum BrowserBookmarks {
                             var n = cleanLine(buffer)
                             if n.isEmpty { n = link.host ?? url }
                             stack[stack.count - 1].links.append(Link(name: n, url: url, description: description, tags: tags))
-                        } else { skipped += 1 }
+                            lastLinkKept = true
+                        } else { skipped += 1; lastLinkKept = false }
                     }
                     capture = .none
                 case ("dd", false):

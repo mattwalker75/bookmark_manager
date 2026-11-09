@@ -2,6 +2,28 @@
 
 All notable changes to Bookmark Manager (Keep a Changelog style; dates are when the change was made).
 
+## [1.2.1] — 2026-11-08
+
+Matt, Nov 8 2026: five of the findings from the code review of 1.2, fixed as one batch.
+
+### Fixed
+- 2026-11-08: **Deleting a directory closed its notes window first** — the window went away (with anything
+  being typed in it) before the delete was even tried; a refused delete (the directory isn't empty) then left the
+  directory but had lost the draft. The window — and a bookmark's secret and notes windows — now close only once
+  the item is really gone.
+- 2026-11-08: **A failed browser import reported success** — when the save failed after *Add the tab*, the
+  Export & import pane still said "Imported …" while the real reason sat in a notice behind the sheet. The sheet
+  now just closes and the pane says nothing; the notice says why.
+- 2026-11-08: **A directory holding only notes was deleted as "empty"** — the *Delete the directory …?* dialog
+  said "It is empty, so nothing else is lost." The delete still goes ahead (nothing inside it), but the dialog
+  now says the notes are deleted with it.
+- 2026-11-08: **A description after a skipped link landed on the wrong bookmark** — in a Firefox export, the
+  `<DD>` under a bookmarklet (left out) was hung on the kept link before it. A description now only ever
+  describes the link just before it, and one after a left-out link is dropped.
+- 2026-11-08: **A folders-only export was rejected** — a bookmarks file with folders but not a single link was
+  called "not a browser's bookmarks file". It reads now; the sheet shows no bookmarks and the empty folders left
+  out, with *Add the tab* disabled.
+
 ## [1.2.0] — 2026-11-08
 
 Matt, Nov 8 2026: three more things for the daily use — notes on directories, a way to bring a browser's

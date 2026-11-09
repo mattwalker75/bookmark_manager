@@ -27,15 +27,15 @@ final class BrowserImportModelTests: XCTestCase {
         let file = try BrowserBookmarks.parse(Data(html.utf8))
         XCTAssertEqual(file.browser, "Safari")
         let tabsBefore = m.library.tabs.count
-        let notes = m.importBrowser(file, tabName: "Safari bookmarks")
+        let notes = try XCTUnwrap(m.importBrowser(file, tabName: "Safari bookmarks"))
         XCTAssertEqual(m.library.tabs.count, tabsBefore + 1)
         XCTAssertEqual(m.library.tabs.last?.name, "Safari bookmarks")
         XCTAssertEqual(m.selectedTabId, m.library.tabs.last?.id, "the new tab is the one shown")
         XCTAssertEqual(notes.first, "Added the tab “Safari bookmarks” with 1 directory and 2 bookmarks.")
         XCTAssertEqual(try LibraryStore(folder: home).load().tabs.last?.bookmarkCount, 2, "on disk")
         XCTAssertNil(m.notice)
-        // a blank name: nothing added, a notice
-        XCTAssertTrue(m.importBrowser(file, tabName: " ").isEmpty)
+        // a blank name: nothing added, nil (not an empty success), a notice
+        XCTAssertNil(m.importBrowser(file, tabName: " "), "a refused import is nil, never a list of notes")
         XCTAssertEqual(m.library.tabs.count, tabsBefore + 1); XCTAssertEqual(m.notice?.title, "Nothing was imported")
     }
 }
