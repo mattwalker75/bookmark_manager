@@ -55,7 +55,11 @@ it is not a developer: every message is a plain sentence.
 3. **Delete only when empty:** a tab, directory or sub-directory with anything in it is refused with a sentence
    naming what is inside. Deleting a bookmark asks first (confirm buttons have no destructive role, Cancel is default).
    Notes do not make a directory "full": it is deletable, and the dialog says the notes go with it
-   (`Folder.emptyDeleteMessage`). An item's secret/notes windows close only AFTER a delete went through (1.2.1).
+   (`Folder.emptyDeleteMessage`). An item's secret/notes windows close only AFTER a delete (or Delete notes) went
+   through (1.2.1 / 1.2.2). Editors save only what they changed (`Bookmark.applyingEdits`, FolderEditor passes nil
+   for untouched notes) so a report window or the notes window can change the item while the sheet is open.
+   `ReportWindows.edit` never replaces an editor that is already up; a notice raised from a report window brings
+   the main window (which owns the alert) forward.
 4. **Order is manual** (drag and drop, Move to…); "Sort by name" sorts one directory once. Drop rules live in
    `Arrange.swift` only; views just report drops (`AppModel.drop`). A directory dropped on a bookmark row goes into that
    row's directory; a bookmark dropped on a row lands before it; tabs reorder by dragging along the tab bar.
@@ -156,8 +160,12 @@ it is not a developer: every message is a plain sentence.
     Addresses only — same NAMES are not duplicates (Matt had no say; my default, Nov 8 2026).
 11. **Files are never lost:** a damaged library.json / unreadable secrets are moved aside (`*.unreadable-<date>`) and
     reported; a damaged library.json takes a COPY of secrets.enc with it (review: the next save would prune them).
-    Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json, then the prune — a failed library
-    write loses no secret. Repeated ids are repaired on load and on import. Settings decode every field with a default.
+    A damaged secrets.enc with a GOOD secret.key keeps the key (review 3: it opens every backup made so far); only a
+    damaged key retires both. Saving is two-phase (review): secrets.enc gets old ∪ new, then library.json (the save —
+    `remember()` right there), then the prune, whose failure is swallowed (a superset is harmless). Repeated ids are
+    repaired on load and on import. Settings decode every field with a default; a settings.json that is not JSON at
+    all is moved aside (`AppSettings.loadProblem` → notice), never written over; `AppSettings.save()` returns false
+    and the model's `didSet` says so. `Library.isBlank` is THE no-name rule (editors, library, Validate alike).
 11a. **Backups** (Matt, Oct 29 2026; mockup board "Backups"): `Backup` (core) writes ONE JSON `.bmbackup` with the
     library (secrets blank) + the secrets sealed with THIS MAC'S secret.key + optionally the key sealed with a
     passphrase (`PassphraseWrap`, PBKDF2 600k rounds); `BackupStore` lists / writes / `setKept` (kept + note live IN

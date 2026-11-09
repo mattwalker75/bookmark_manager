@@ -59,7 +59,7 @@ public final class LibraryStore: @unchecked Sendable {
 
     /// Renames a file to "<name>.unreadable-<date>" beside it; returns the new name.
     @discardableResult
-    static func moveAside(_ u: URL) -> String? {
+    public static func moveAside(_ u: URL) -> String? {
         guard FileManager.default.fileExists(atPath: u.path) else { return nil }
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd-HHmmss"; f.locale = Locale(identifier: "en_US_POSIX")
         let name = "\(u.lastPathComponent).unreadable-\(f.string(from: Date()))"
@@ -95,8 +95,13 @@ public final class LibraryStore: @unchecked Sendable {
         var values: [String: String] = [:]
         do { values = try secrets.load() }
         catch {
-            let a = Self.moveAside(secrets.dataURL), k = Self.moveAside(secrets.keyURL)
-            problem = "\((error as? BMError)?.message ?? error.localizedDescription) The old files were kept as \([a, k].compactMap { $0 }.joined(separator: " and ")). Your bookmarks loaded without their secrets: type them again in each bookmark's editor."
+            // the key itself read fine: it stays (review, Nov 8 2026 — it is what opens the secrets in every backup
+            // made so far; retiring it with the damaged secrets file locked those backups for no reason)
+            let keyFine = (try? secrets.currentKey()) != nil
+            let a = Self.moveAside(secrets.dataURL), k = keyFine ? nil : Self.moveAside(secrets.keyURL)
+            let kept = [a, k].compactMap { $0 }.joined(separator: " and ")
+            problem = "\((error as? BMError)?.message ?? error.localizedDescription) The old file\(k == nil ? " was" : "s were") kept as \(kept). Your bookmarks loaded without their secrets: type them again in each bookmark's editor."
+                + (keyFine ? " The secrets key was kept, so the secrets in your backups still open (Settings → Backups → Verify)." : "")
         }
         for t in lib.tabs.indices { LibraryStore.fill(&lib.tabs[t], values) }
         remember()
@@ -139,8 +144,12 @@ public final class LibraryStore: @unchecked Sendable {
         try secrets.save(old.merging(values) { _, new in new })
         try JSON.encoder.encode(LibraryFile(library: plain)).write(to: url, options: .atomic)
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-        if Set(old.keys) != Set(values.keys) { try secrets.save(values) }
+        // the library is on disk: that is the save. Remember its stamp NOW (review, Nov 8 2026: a prune that failed
+        // after this point left the old stamp behind, and every later save was refused as "changed by something
+        // else"). The prune only drops secrets nothing points at any more — a superset is harmless and the next save
+        // prunes again, so its failure is not the save's failure.
         remember()
+        if Set(old.keys) != Set(values.keys) { try? secrets.save(values) }
     }
     static func strip(_ f: inout Folder, into values: inout [String: String]) {
         for i in f.bookmarks.indices {

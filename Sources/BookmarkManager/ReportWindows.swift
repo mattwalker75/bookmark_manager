@@ -4,6 +4,7 @@
 // its close button; a second ask brings the same window forward. Resizable, and the place it was left is kept.
 import SwiftUI
 import AppKit
+import BookmarkManagerCore
 
 @MainActor
 enum ReportWindows {
@@ -39,6 +40,12 @@ enum ReportWindows {
 
     /// Bring the main window forward without closing this one (Show in place, Edit…).
     static func frontMain() { NSApp.windows.first { $0.identifier?.rawValue == "main" }?.makeKeyAndOrderFront(nil) }
+    /// Edit… from a row: the editor sheet on the main window — unless one is already up, which then just comes
+    /// forward (review, Nov 8 2026: a second Edit… used to replace the open editor and lose what was typed in it).
+    static func edit(_ b: Bookmark, model: AppModel) {
+        if model.sheet == nil { model.sheet = .editBookmark(b) }
+        frontMain()
+    }
 
     private final class Closer: NSObject, NSWindowDelegate {
         static let shared = Closer()
@@ -55,6 +62,9 @@ private struct ReportRoot<Content: View>: View {
     @ViewBuilder let content: () -> Content
     var body: some View {
         content()
+            // a refusal raised by a click here is an alert on the MAIN window: bring it forward so it is seen
+            // (review, Nov 8 2026)
+            .onChange(of: model.notice?.id) { _, id in if id != nil { ReportWindows.frontMain() } }
             .environmentObject(model).environmentObject(model.icons)
             .font(DS.body)
             .preferredColorScheme(model.lookInForce.colorScheme)

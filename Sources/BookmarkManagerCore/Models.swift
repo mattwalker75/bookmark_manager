@@ -116,7 +116,8 @@ public struct Bookmark: Codable, Equatable, Identifiable, Sendable {
         }
         s = s.replacingOccurrences(of: " ", with: "%20")
         guard let u = URL(string: s), let scheme = u.scheme, !scheme.isEmpty else { return nil }
-        if scheme == "http" || scheme == "https" { guard let h = u.host, !h.isEmpty else { return nil } }
+        // the scheme as typed may be upper-case (review, Nov 8 2026: "HTTPS://" used to slip past the host check)
+        if ["http", "https"].contains(scheme.lowercased()) { guard let h = u.host, !h.isEmpty else { return nil } }
         return u
     }
 }
@@ -455,6 +456,9 @@ public struct Library: Codable, Equatable, Sendable {
     // MARK: checks
 
     /// Blanks and the invisible characters that look like a name but aren't (zero-width space, the Hangul filler…).
+    /// nothing but whitespace and invisible characters — the one rule for "no name", used by the editors, the
+    /// library and Validate alike (review, Nov 8 2026)
+    public static func isBlank(_ s: String) -> Bool { s.trimmingCharacters(in: blank).isEmpty }
     static let blank: CharacterSet = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}\u{3164}\u{115F}\u{1160}\u{00AD}"))
 
     static func cleanName(_ name: String, what: String) throws -> String {

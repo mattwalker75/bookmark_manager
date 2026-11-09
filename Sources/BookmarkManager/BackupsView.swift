@@ -16,10 +16,11 @@ struct BackupsPane: View {
     @State private var confirmUnkeep: BackupEntry?
     @State private var confirmRemovePassphrase = false
 
-    /// Unkeep asks when the backup would fall off at the very next prune.
+    /// Unkeep asks when the backup would fall off at the very next prune — the prune drops the OLDEST unkept beyond
+    /// "keep the latest N", so what counts is how many unkept backups are newer than this one (review, Nov 8 2026).
     private func unkeep(_ e: BackupEntry) {
-        let unkept = model.backups.filter { $0.readable && !$0.kept }.count
-        if unkept >= model.settings.backupKeep { confirmUnkeep = e } else { model.setKept(e, kept: false, note: "") }
+        let newer = model.backups.filter { $0.readable && !$0.kept && $0.createdAt > e.createdAt }.count
+        if newer >= model.settings.backupKeep { confirmUnkeep = e } else { model.setKept(e, kept: false, note: "") }
     }
 
     private var folderPath: String { model.backupStore.folder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~") }
@@ -32,7 +33,7 @@ struct BackupsPane: View {
                     HStack(spacing: 8) {
                         Text(folderPath).font(DS.mono).lineLimit(1).truncationMode(.middle).textSelection(.enabled)
                         Button("Choose…") { chooseFolder() }
-                        if model.settings.backupFolder != nil { Button("Default") { model.settings.backupFolder = nil; model.refreshBackups() } }
+                        if model.settings.backupFolder != nil { Button("Default") { model.setBackupFolder(nil) } }
                     }
                 }
                 if !FileManager.default.fileExists(atPath: model.backupStore.folder.path) {
@@ -136,8 +137,7 @@ struct BackupsPane: View {
         let p = NSOpenPanel(); p.canChooseDirectories = true; p.canChooseFiles = false; p.canCreateDirectories = true; p.allowsMultipleSelection = false
         p.message = "Choose the folder the backups are written to."
         guard p.runModal() == .OK, let u = p.url else { return }
-        model.settings.backupFolder = u.path
-        model.refreshBackups()
+        model.setBackupFolder(u.path)
     }
     private func saveKey() {
         let p = NSSavePanel(); p.nameFieldStringValue = "Bookmark Manager secret.key"; p.message = "Keep this copy somewhere safe: it opens the secrets in your backups."
@@ -234,8 +234,9 @@ struct BackupCheckSheet: View {
         let p = NSOpenPanel(); p.allowsMultipleSelection = false; p.canChooseDirectories = false
         p.message = "Choose the secret.key file (or the copy you saved) from the Mac that made this backup."
         guard p.runModal() == .OK, let k = p.url else { return }
-        result = model.checkBackup(at: url, keyFile: k)
-        if case .failure(let e) = result! { problem = e.message } else { problem = nil }
+        // a wrong key file is said under the report, which stays (with its Choose… and passphrase controls) — like unlock()
+        let r = model.checkBackup(at: url, keyFile: k)
+        if case .failure(let e) = r { problem = e.message } else { problem = nil; result = r }
     }
     private func unlock() {
         let r = model.checkBackup(at: url, passphrase: passphrase)

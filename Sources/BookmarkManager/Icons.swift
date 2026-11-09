@@ -42,12 +42,14 @@ final class IconCache: ObservableObject {
 
     /// For the tests: what is in flight or waiting.
     var pending: Int { inFlight.count + waiting.count }
+    /// for the tests: how many fetches are going at this moment (never more than `atOnce`)
+    var inFlightCount: Int { inFlight.count }
 
     private func file(_ key: String) -> URL { folder.appendingPathComponent(key + ".png") }
 
     private func enqueue(key: String, page: URL) {
         guard !failed.contains(key), !inFlight.contains(key), !waiting.contains(where: { $0.key == key }),
-              page.scheme == "http" || page.scheme == "https" else { return }
+              ["http", "https"].contains(page.scheme?.lowercased() ?? "") else { return }
         waiting.append((key, page))
         pump()
     }
@@ -98,7 +100,7 @@ enum IconFetcher {
     static func fetch(site page: URL) async -> (image: NSImage, png: Data)? {
         guard let root = root(of: page) else { return nil }
         var html: String?
-        if let data = await read(request(root, accept: "text/html"), upTo: 300_000) {
+        if let data = await read(request(root, accept: "text/html"), upTo: 300_000, partial: true) {
             html = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
         }
         for candidate in Favicons.candidates(page: root, html: html).prefix(5) {
@@ -111,13 +113,16 @@ enum IconFetcher {
     }
 
     /// At most `limit` bytes of a 2xx answer, read as they arrive and stopped there (review 2: a 50 MB page used to
-    /// be downloaded whole); nil for any other answer.
-    static func read(_ r: URLRequest, upTo limit: Int) async -> Data? {
+    /// be downloaded whole); nil for any other answer. `partial` = the front of a bigger answer is still worth
+    /// having (a page: its <head> with the icon link is at the front — review, Nov 8 2026, it used to be skipped
+    /// altogether); an image is wanted whole or not at all. A page many times the cap (a download behind a web
+    /// address, say) is left alone either way.
+    static func read(_ r: URLRequest, upTo limit: Int, partial: Bool = false) async -> Data? {
         guard let (bytes, response) = try? await session.bytes(for: r),
               (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true else { return nil }
-        if response.expectedContentLength > Int64(limit) { bytes.task.cancel(); return nil }
+        if response.expectedContentLength > Int64(limit) * (partial ? 8 : 1) { bytes.task.cancel(); return nil }
         var data = Data()
-        data.reserveCapacity(min(limit, max(0, Int(response.expectedContentLength))))
+        data.reserveCapacity(min(limit, max(0, Int(clamping: response.expectedContentLength))))
         do {
             for try await b in bytes {
                 data.append(b)
@@ -127,7 +132,7 @@ enum IconFetcher {
         return data
     }
 
-    private static func request(_ url: URL, accept: String) -> URLRequest {
+    static func request(_ url: URL, accept: String) -> URLRequest {
         var r = URLRequest(url: url)
         r.setValue(accept, forHTTPHeaderField: "Accept")
         return r

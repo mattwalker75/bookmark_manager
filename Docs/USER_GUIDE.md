@@ -145,7 +145,9 @@ hidden until you ask for it.
   The window has **Stop** while it runs and **Check again** after; Settings → General keeps **Last results…**.
 - The check reads only each page's headers, never the page; it follows a site's "moved" only to another web
   address, never from https down to plain http (that is reported as "Sent to an unencrypted address"), and never
-  sends a password typed into an address. If nothing answers at all (no connection), the last results are kept.
+  sends a password typed into an address. If nothing answers at all on a check of everything (no connection), the
+  last results are kept; a check of one directory always reports what it found — a directory of dead sites is
+  exactly that.
 - After a check, a problem bookmark wears a small red mark on its icon and a red line under its name saying what
   happened and when. The mark goes when you edit the address or the next check finds it fine — or when you
   **Clear** it in the list (or right-click the row → Clear link mark). Clear offers two things: clear this mark
@@ -230,7 +232,7 @@ hidden until you ask for it.
 - **The secrets inside** are sealed with this Mac's secret key, the same as on disk. So: **Save a copy of the
   secret key…** once, somewhere safe (a password manager, a USB stick); **Show the key in Finder** finds it.
   Optionally **set a passphrase**; from then on each backup also opens with the words alone. If this Mac's key is
-  ever replaced (that happens when the secrets file was unreadable), the pane says the passphrase no longer
+  ever replaced (that happens when the key file itself was unreadable), the pane says the passphrase no longer
   matches and asks you to set it again.
 - **Written as** can instead be **Plain text** — then every secret is written in the clear in each backup from
   then on, readable by anyone who has the file (or a copy Time Machine or iCloud makes of it). Off unless you
@@ -250,4 +252,5 @@ sentence saying so, and nothing is lost: quit the other copy, then quit and reop
 and `secret.key` (the secrets, encrypted; the key is readable by you only), `settings.json`, `icons/`,
 `linkcheck.json` (the last link check) and `Backups/` (unless you chose another folder). A damaged
 bookmarks or secrets file is moved aside with the date in its name (the secrets are kept beside a damaged
-bookmarks file), never overwritten; a damaged settings file is ignored and replaced.
+bookmarks file), never overwritten; so is a damaged settings file (a notice says so, and the settings start over).
+When only the secrets file is damaged, the secret key is kept, so the secrets in your backups still open.

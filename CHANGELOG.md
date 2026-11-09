@@ -2,9 +2,60 @@
 
 All notable changes to Bookmark Manager (Keep a Changelog style; dates are when the change was made).
 
-## [Unreleased]
+## [1.2.2] — 2026-11-08
+
+Matt, Nov 8 2026: the results lists as windows of their own, then a deep review by five reviewers (core models,
+parsers and network, the app model and windows, the views, data safety and the tests) — every verified finding
+fixed, each with a test.
 
 ### Fixed
+- 2026-11-08: **Link-check marks missed bookmarks typed without a scheme, with a space, or with a non-ASCII
+  letter** — the checked address is "https://example.com/x" while the bookmark says "example.com/x", so the row
+  wore no mark, the banner didn't count it, and *Use new address* refused it as "changed since". The mark now
+  follows the address as typed.
+- 2026-11-08: **An upper-case scheme (HTTP://, HTTPS://) was never checked and never got an icon**, and slipped
+  past the "needs a host" rule. Schemes are compared without regard to case now.
+- 2026-11-08: **A check of one directory of dead sites was thrown away as "no connection"** — that rule applies
+  only to a check of everything now.
+- 2026-11-08: **Firefox tags were not decoded** (`R&amp;D` came in literally). They are, like the addresses.
+- 2026-11-08: **A front page bigger than the icon fetcher's cap was skipped altogether**, so a site with its icon
+  on a CDN and no /favicon.ico got the fallback glyph for good. The front of the page is read now (up to the cap);
+  an image bigger than its cap is still left alone.
+- 2026-11-08: **A JSON import whose save was refused was reported as "Imported …"** — the pane says nothing was
+  imported now, and the notice says why.
+- 2026-11-08: **A settings file that couldn't be written was never mentioned** — the backup passphrase "was set"
+  and was gone at the next launch. A notice says so now. **A settings file that isn't JSON at all was silently
+  replaced** — it is moved aside with the date in its name and a notice says so.
+- 2026-11-08: **A damaged secrets file retired a good secret key**, so every backup's secrets stopped opening
+  "with this Mac's key". When the key reads fine it stays; only a damaged key retires both.
+- 2026-11-08: **A new backup folder stayed empty until something changed** — choosing a folder (or Default) now
+  forgets the last backup's digest, so the next automatic backup writes into it.
+- 2026-11-08: **A save whose secrets prune failed left every later save refused as "changed by something else"**
+  until relaunch. The library write is the save; the prune's failure is harmless and swallowed.
+- 2026-11-08: **Validate let names made only of invisible characters through** (a word joiner, a soft hyphen…)
+  that the editor refuses. Validate, the editors and the library share one rule now.
+- 2026-11-08: **The notes window lost its clickable addresses after Edit → Cancel or Save** until reopened, and
+  **didn't grow to fit after a Save** that added lines. Both fixed.
+- 2026-11-08: **Delete notes… closed the window before the delete was tried**, so a refused save kept the notes
+  but lost the window. The window closes only once the notes are gone.
+- 2026-11-08: **A second Edit… from the Link check or Duplicates window replaced the editor already open**,
+  throwing away what was typed. The open editor comes forward instead. **A refusal raised from those windows**
+  (Use new address on a changed bookmark, say) appeared as an alert behind them; the main window comes forward.
+- 2026-11-08: **A web bookmark switched to Secret only with nothing typed lost its address** and became an empty
+  row; it is refused like a new empty secret. **Turning the secret off with text in the box** asks first now, like
+  the notes.
+- 2026-11-08: **Verify → Choose the key file… with the wrong key** left a dead end (the report and its controls
+  gone). The report stays and the reason is shown under it.
+- 2026-11-08: **Unkeep said "there are already N newer backups" when there weren't** — it counts only newer unkept
+  backups now, the ones that decide whether this one would be pruned.
+- 2026-11-08: **The empty page of a directory said "drag bookmarks here" but took no drop.** It does now.
+- 2026-11-08: **The delete question in the Duplicates window got its plural wrong** ("the other bookmarks" for one).
+- 2026-11-08: **A hide-after number outside 1…86400 typed into Settings was not applied on Return** (the field is
+  not a SwiftUI field, so Return never reached it); it is applied when the field is left.
+- 2026-11-08: **A tab name made only of invisible characters closed the sheet and failed behind it.** The sheet
+  tries the name with the library's own rule and shows the refusal in place.
+- 2026-11-08: Tests — two that could not fail (the icon fetch limit, the fetchIcons setting) now can; the clipboard
+  test uses a pasteboard of its own instead of Matt's; a test restores the home variable it changed.
 - 2026-11-08: **An editor left open overwrote changes made elsewhere** — the bookmark editor saved the whole
   bookmark as it opened it, so notes saved from the notes window, or a new address taken in the link check, while
   the sheet was open were put back on Save; the directory editor did the same to its notes. Both now save only

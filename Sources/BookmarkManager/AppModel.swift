@@ -54,7 +54,10 @@ final class AppModel: ObservableObject {
     @Published var focusSearch = 0
     @Published var settings = AppSettings.load() { didSet {
         guard settings != oldValue else { return }
-        settings.save(); Theme.apply(settings); icons.enabled = settings.fetchIcons
+        // a settings file that can't be written is said once per change (review, Nov 8 2026: the passphrase
+        // "was set" and was gone at the next launch)
+        if !settings.save() { notice = Notice(title: "The settings could not be saved", message: "Bookmark Manager couldn't write \(AppSettings.url.path). The change holds until you quit; check the folder and try again.") }
+        Theme.apply(settings); icons.enabled = settings.fetchIcons
         if settings.secretHideSeconds != oldValue.secretHideSeconds { SecretWindows.rearmAll() }
     } }
     @Published var settingsTab = "general"
@@ -86,6 +89,10 @@ final class AppModel: ObservableObject {
         library = lib
         selectedTabId = lib.tabs[0].id
         selectedPath = FolderPath(tab: lib.tabs[0].id)
+        if let p = AppSettings.loadProblem {
+            AppSettings.loadProblem = nil
+            first = first.map { Notice(title: $0.title, message: $0.message + "\n\n" + p) } ?? Notice(title: "The settings could not be read", message: p)
+        }
         notice = first
         Theme.apply(settings)
         icons.enabled = settings.fetchIcons
@@ -109,9 +116,12 @@ final class AppModel: ObservableObject {
     var linkProblems: [UUID: LinkResult] {
         guard let r = linkReport else { return [:] }
         var out: [UUID: LinkResult] = [:]
-        for p in r.problems { if let b = library.bookmark(p.bookmarkId), b.url == p.url { out[b.id] = p } }
+        for p in r.problems { if let b = library.bookmark(p.bookmarkId), AppModel.sameAddress(b, p.url) { out[b.id] = p } }
         return out
     }
+    /// The checked address (what the checker was given — `link`, with the scheme filled in and spaces encoded)
+    /// against the bookmark as typed: "example.com/x" was checked as "https://example.com/x" (review, Nov 8 2026).
+    static func sameAddress(_ b: Bookmark, _ checked: String) -> Bool { b.url == checked || b.link?.absoluteString == checked }
     var linkCheckRunning: Bool { linkProgress != nil }
     /// The banner above the list: an automatic check found problems and nobody has looked yet.
     var linkBanner: LinkReport? { guard let r = linkReport, r.automatic, !r.bannerDismissed, !linkProblems.isEmpty else { return nil }; return r }
@@ -130,7 +140,7 @@ final class AppModel: ObservableObject {
             return
         }
         let bookmarks = path.flatMap { library.folder(at: $0) }?.allBookmarks ?? library.allBookmarks
-        let items = bookmarks.filter { !$0.skipLinkCheck }.compactMap { b in b.link.map { (id: b.id, url: $0) } }.filter { ["http", "https"].contains($0.url.scheme ?? "") }
+        let items = bookmarks.filter { !$0.skipLinkCheck }.compactMap { b in b.link.map { (id: b.id, url: $0) } }.filter { ["http", "https"].contains($0.url.scheme?.lowercased() ?? "") }
         let scope = path.map { placeName($0) }
         linkProgress = LinkCheckProgress(total: items.count)
         linkNote = nil
@@ -144,8 +154,9 @@ final class AppModel: ObservableObject {
             let wasAutomatic = automatic && !linkManualAsked
             defer { linkProgress = nil; linkTask = nil }
             if found.isEmpty, cancelled { linkNote = "Stopped before any address had answered. The last results were kept."; return }
-            // nothing at all answered: that is this Mac's connection, not the bookmarks — the last results stay
-            if found.count >= 2, found.allSatisfy({ if case .unreachable = $0.verdict { return true }; return false }) {
+            // nothing at all answered: that is this Mac's connection, not the bookmarks — the last results stay.
+            // Only for a check of everything: one directory of dead sites is exactly what a check is for (review, Nov 8 2026)
+            if scope == nil, found.count >= 2, found.allSatisfy({ if case .unreachable = $0.verdict { return true }; return false }) {
                 linkNote = "Nothing answered at all, so this probably isn't about the bookmarks — no connection, most likely. The last results were kept."
                 if wasAutomatic { settings.lastLinkCheckAt = Date() }   // tried; the schedule waits its turn again
                 return
@@ -175,7 +186,7 @@ final class AppModel: ObservableObject {
     /// "Use new address" on a moved bookmark.
     func useNewAddress(_ r: LinkResult) {
         guard case .moved(let to) = r.verdict, var b = library.bookmark(r.bookmarkId) else { return }
-        guard b.url == r.url else { notice = Notice(title: "The address was changed since", message: "“\(b.name)” no longer has the address that was checked, so the new one wasn't put in. Check the links again."); return }
+        guard AppModel.sameAddress(b, r.url) else { notice = Notice(title: "The address was changed since", message: "“\(b.name)” no longer has the address that was checked, so the new one wasn't put in. Check the links again."); return }
         guard let u = URL(string: to), ["http", "https"].contains(u.scheme?.lowercased() ?? "") else {
             notice = Notice(title: "Not an address for a bookmark", message: "The site sends “\(b.name)” to \(to), which isn't a web address. Edit the bookmark yourself if you want to follow it."); return
         }
@@ -310,7 +321,7 @@ final class AppModel: ObservableObject {
     }
     var focusedHasNotes: Bool { (focusedBookmark?.hasNotes ?? false) || (focusedFolder?.hasNotes ?? false) }
     /// ⌘L: the focused bookmark's address (a secret-only one has none).
-    func copyFocusedAddress() { if let b = focusedBookmark, !b.isSecretOnly { copyAddress(b) } }
+    func copyFocusedAddress(to pasteboard: NSPasteboard = .general) { if let b = focusedBookmark, !b.isSecretOnly { copyAddress(b, to: pasteboard) } }
     /// ⌘↑: the directory above, with the one just left under the arrow keys.
     func goUp() {
         guard !isSearching, let parent = selectedPath.parent else { return }
@@ -367,6 +378,13 @@ final class AppModel: ObservableObject {
     /// the backups in the folder, as the pane shows them (refreshBackups() reads the folder again)
     @Published var backups: [BackupEntry] = []
     func refreshBackups() { backups = backupStore.list() }
+    /// Settings → Backups → Choose… / Default. The digest is forgotten so the next automatic backup writes into the
+    /// new folder even when nothing changed (review, Nov 8 2026: a new folder stayed empty for days).
+    func setBackupFolder(_ path: String?) {
+        guard settings.backupFolder != path else { return }
+        settings.backupFolder = path; settings.lastBackupDigest = nil
+        refreshBackups()
+    }
 
     /// Writes a backup now. `force` = even when nothing changed since the last one (by hand, before a restore).
     /// Returns a sentence about what happened, or nil when it was skipped because nothing changed.
@@ -480,7 +498,7 @@ final class AppModel: ObservableObject {
         settings.lastBackupDigest = Backup.digest(library)
         refreshBackups()
         var s = "Restored \(check.file.counts.text) from \(check.url.lastPathComponent)."
-        if !notes.isEmpty { s += " " + notes.joined(separator: " ") }
+        if let notes, !notes.isEmpty { s += " " + notes.joined(separator: " ") }
         return s
     }
     /// A copy of secret.key, for the fresh-Mac day.
@@ -592,13 +610,15 @@ final class AppModel: ObservableObject {
     /// Delete notes… (asked first, in the window): the bookmark or directory stays, its notes are turned off —
     /// the row loses its Notes button until the editor turns them on again (Matt).
     func deleteNotes(_ id: UUID) {
-        NotesWindows.close(id)
+        // the window goes only once the notes are gone (review, Nov 8 2026 — a refused save kept the notes but had lost the window)
+        var done = false
         if var b = library.bookmark(id) {
             b.hasNotes = false; b.notes = ""
-            change("The notes weren't deleted") { try $0.updateBookmark(b) }
+            done = change("The notes weren't deleted") { try $0.updateBookmark(b) }
         } else if let f = library.folder(id) {
-            change("The notes weren't deleted") { try $0.updateFolder(id, name: f.name, description: f.description, colorId: f.colorId, hasNotes: false, notes: "") }
+            done = change("The notes weren't deleted") { try $0.updateFolder(id, name: f.name, description: f.description, colorId: f.colorId, hasNotes: false, notes: "") }
         }
+        if done { NotesWindows.close(id) }
     }
     /// The notes window's Show directory: the directory opens in the main window.
     func revealFolder(_ id: UUID) {
@@ -651,9 +671,9 @@ final class AppModel: ObservableObject {
         return (settings.browser, "The browser picked for this bookmark isn't installed any more, so the browser from Settings was used. Edit the bookmark to pick another, or set it back to the browser from Settings.")
     }
 
-    func copyAddress(_ b: Bookmark) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(b.link?.absoluteString ?? b.url, forType: .string)
+    func copyAddress(_ b: Bookmark, to pasteboard: NSPasteboard = .general) {
+        pasteboard.clearContents()
+        pasteboard.setString(b.link?.absoluteString ?? b.url, forType: .string)
     }
 
     /// Shows the secret window — after Touch ID (or the Mac's password) when Settings asks for it; one check
@@ -687,11 +707,12 @@ final class AppModel: ObservableObject {
 
     func exportData(includeSecrets: Bool) throws -> Data { try Transfer.export(library, includeSecrets: includeSecrets) }
 
-    func importFile(_ f: ExportFile, mode: ImportMode) -> [String] {
+    /// nil = nothing was imported: the save was refused, and a notice says why (review, Nov 8 2026)
+    func importFile(_ f: ExportFile, mode: ImportMode) -> [String]? {
         let (lib, notes) = Transfer.apply(f, to: library, mode: mode)
         let old = library
         library = lib
-        guard save() else { library = old; fixSelection(); return [] }
+        guard save() else { library = old; fixSelection(); return nil }
         // open secret windows: closed for bookmarks that are gone, brought up to date for the rest (a replace keeps ids)
         let stillThere = Set(lib.allBookmarks.map(\.id)), foldersThere = Set(lib.allFolders.map(\.id))
         for id in old.allBookmarks.map(\.id) where !stillThere.contains(id) { SecretWindows.close(id); NotesWindows.close(id) }
@@ -824,15 +845,27 @@ struct AppSettings: Codable, Equatable {
 
     static var url: URL { Home.folder().appendingPathComponent("settings.json") }
     static let encoder: JSONEncoder = { let e = JSONEncoder(); e.dateEncodingStrategy = .iso8601; e.outputFormatting = [.prettyPrinted, .sortedKeys]; return e }()
+    /// set by `load` when settings.json existed but could not be read: the sentence for the notice
+    static var loadProblem: String?
     static func load() -> AppSettings {
         let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
-        guard let data = try? Data(contentsOf: url), let s = try? d.decode(AppSettings.self, from: data) else { return AppSettings() }
-        return s
+        guard let data = try? Data(contentsOf: url) else { return AppSettings() }
+        do { return try d.decode(AppSettings.self, from: data) }
+        catch {
+            // not JSON at all (a wrong-typed field is forgiven per field above): kept aside like library.json, so
+            // the next settings change doesn't write defaults over it (review, Nov 8 2026)
+            let kept = LibraryStore.moveAside(url)
+            loadProblem = "The settings file could not be read, so the settings start over: the backup passphrase, the backup folder and the look are back to their defaults." + (kept.map { " The old file was kept as \($0) in \(url.deletingLastPathComponent().path)." } ?? "")
+            return AppSettings()
+        }
     }
-    func save() {
-        guard let data = try? AppSettings.encoder.encode(self) else { return }
-        try? data.write(to: AppSettings.url, options: .atomic)
+    /// false when the file could not be written (the caller says so)
+    @discardableResult
+    func save() -> Bool {
+        guard let data = try? AppSettings.encoder.encode(self) else { return false }
+        do { try data.write(to: AppSettings.url, options: .atomic) } catch { return false }
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: AppSettings.url.path)   // it holds the passphrase wrap
+        return true
     }
 }
 

@@ -559,6 +559,12 @@ struct FolderDetail: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.bottom, 40)
+        .contentShape(Rectangle())
+        // the sentence above promises a drop here (review, Nov 8 2026: there was no target on the empty page)
+        .dropDestination(for: String.self) { items, _ in
+            guard let token = items.first else { return false }
+            return model.drop(token, to: path)
+        }
     }
 }
 

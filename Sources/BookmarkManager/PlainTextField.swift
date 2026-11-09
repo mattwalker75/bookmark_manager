@@ -12,9 +12,12 @@ struct PlainTextField: NSViewRepresentable {
     var monospaced = false
     /// what the field is for, read out by VoiceOver and shown as the form label by the caller
     var label: String?
+    /// called when the field is left (Return, Tab, a click elsewhere), after the binding holds what was typed —
+    /// SwiftUI's `.onSubmit` never fires for an NSViewRepresentable (review, Nov 8 2026)
+    var onEnd: (() -> Void)?
 
-    init(_ placeholder: String, text: Binding<String>, monospaced: Bool = false, label: String? = nil) {
-        self.placeholder = placeholder; _text = text; self.monospaced = monospaced; self.label = label
+    init(_ placeholder: String, text: Binding<String>, monospaced: Bool = false, label: String? = nil, onEnd: (() -> Void)? = nil) {
+        self.placeholder = placeholder; _text = text; self.monospaced = monospaced; self.label = label; self.onEnd = onEnd
     }
 
     func makeNSView(context: Context) -> NSTextField {
@@ -52,7 +55,11 @@ struct PlainTextField: NSViewRepresentable {
         var editing = false
         init(_ p: PlainTextField) { parent = p }
         func controlTextDidBeginEditing(_ n: Notification) { editing = true }
-        func controlTextDidEndEditing(_ n: Notification) { editing = false }
+        func controlTextDidEndEditing(_ n: Notification) {
+            editing = false
+            // the binding is written a turn late (below); the end callback goes after it
+            if let end = parent.onEnd { DispatchQueue.main.async { end() } }
+        }
         func controlTextDidChange(_ n: Notification) {
             // SwiftUI may be mid-update; writing the binding on the next turn keeps the field's text intact
             guard let f = n.object as? NSTextField else { return }

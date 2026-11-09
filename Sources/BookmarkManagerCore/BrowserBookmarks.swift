@@ -115,7 +115,7 @@ public enum BrowserBookmarks {
                 case ("a", false):
                     settlePending()
                     let href = attrs["href"] ?? ""
-                    let tags = (attrs["tags"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                    let tags = decode(attrs["tags"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
                     capture = .a(href: href, tags: tags, description: cleanLine(attrs["description"] ?? "")); buffer = ""
                 case ("a", true):
                     if case .a(let href, let tags, let description) = capture {

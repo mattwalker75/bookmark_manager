@@ -144,7 +144,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(exists("settings.json"))
         let again = model()
         XCTAssertEqual(again.settings.browser, "com.google.Chrome")
-        XCTAssertFalse(again.settings.fetchIcons)
+        XCTAssertFalse(AppSettings.load().fetchIcons, "read from the file itself — the helper above sets it on the model")
     }
 
     func testDepthAndColorsLiveInTheLibrary() {
@@ -229,7 +229,7 @@ final class AppReviewTests: XCTestCase {
         // fifty sites that are all this Mac (closed ports on 127.0.0.1): nothing leaves the machine, every fetch fails fast
         for i in 0..<50 { _ = cache.image(for: "http://127.0.0.1:\(2000 + i)/") }
         XCTAssertEqual(cache.pending, 50)
-        XCTAssertLessThanOrEqual(cache.pending - 46, 4, "at most four in flight")
+        XCTAssertLessThanOrEqual(cache.inFlightCount, cache.atOnce, "at most four in flight"); XCTAssertGreaterThan(cache.inFlightCount, 0)
         cache.enabled = false
         _ = cache.image(for: "http://127.0.0.1:1999/")
         XCTAssertEqual(cache.pending, 50, "fetching off: nothing new is queued")
@@ -387,14 +387,15 @@ final class KeyboardTests: XCTestCase {
         m.selectNextTab(-1); XCTAssertEqual(m.currentTab?.name, names[names.count - 1], "and back")
         let secretOnly = try XCTUnwrap(m.library.allBookmarks.first { $0.isSecretOnly })
         let web = try XCTUnwrap(m.library.allBookmarks.first { !$0.isSecretOnly })
-        let clipboardBefore = NSPasteboard.general.string(forType: .string)   // Matt's clipboard is put back after
-        defer { NSPasteboard.general.clearContents(); if let c = clipboardBefore { NSPasteboard.general.setString(c, forType: .string) } }
-        NSPasteboard.general.clearContents(); NSPasteboard.general.setString("before", forType: .string)
-        m.focusId = secretOnly.id; m.copyFocusedAddress()
-        XCTAssertEqual(NSPasteboard.general.string(forType: .string), "before", "a secret-only item has no address to copy")
+        // a pasteboard of the test's own: Matt's clipboard is never touched (review, Nov 8 2026)
+        let pb = NSPasteboard(name: NSPasteboard.Name("bookmarkmanager-tests-\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }
+        pb.clearContents(); pb.setString("before", forType: .string)
+        m.focusId = secretOnly.id; m.copyFocusedAddress(to: pb)
+        XCTAssertEqual(pb.string(forType: .string), "before", "a secret-only item has no address to copy")
         m.select(try XCTUnwrap(m.library.location(ofBookmark: web.id)))   // the focus only acts on rows that are on the page
-        m.focusId = web.id; m.copyFocusedAddress()
-        XCTAssertEqual(NSPasteboard.general.string(forType: .string), web.link?.absoluteString)
+        m.focusId = web.id; m.copyFocusedAddress(to: pb)
+        XCTAssertEqual(pb.string(forType: .string), web.link?.absoluteString)
     }
 }
 

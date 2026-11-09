@@ -113,7 +113,7 @@ public enum Transfer {
         }
         var colorIds = Set<UUID>()
         for c in lib.colors {
-            if c.name.trimmingCharacters(in: .whitespaces).isEmpty { r.problems.append(Problem(place: "Color codes", text: "A color code has no name.", stops: true)) }
+            if Library.isBlank(c.name) { r.problems.append(Problem(place: "Color codes", text: "A color code has no name.", stops: true)) }
             if !colorIds.insert(c.id).inserted { r.problems.append(Problem(place: "Color codes", text: "Two color codes share the same id.", stops: true)) }
             for v in [c.rgb.r, c.rgb.g, c.rgb.b] where !(0...1).contains(v) {
                 r.problems.append(Problem(place: "Color code “\(c.name)”", text: "Its color values must be between 0 and 1.", stops: true)); break
@@ -136,19 +136,19 @@ public enum Transfer {
     }
 
     private static func check(_ f: Folder, level: Int, place: [String], lib: Library, colorIds: Set<UUID>, ids: inout Set<UUID>, report r: inout ValidationReport) {
-        let here = place + [f.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "(no name)" : f.name]
+        let here = place + [Library.isBlank(f.name) ? "(no name)" : f.name]
         let where_ = here.joined(separator: " › ")
         let what = level == 0 ? "tab" : Library.levelName(level)
         if level > 0 { r.folders += 1 }
-        if f.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { r.problems.append(Problem(place: where_, text: "This \(what) has no name.", stops: true)) }
+        if Library.isBlank(f.name) { r.problems.append(Problem(place: where_, text: "This \(what) has no name.", stops: true)) }
         if !ids.insert(f.id).inserted { r.problems.append(Problem(place: where_, text: "Its id is used twice in the file.", stops: true)) }
         if level > lib.maxDepth { r.problems.append(Problem(place: where_, text: "This \(what) is \(level) levels deep, but the file allows \(lib.maxDepth).", stops: true)) }
         if let c = f.colorId, !colorIds.contains(c) { r.problems.append(Problem(place: where_, text: "Its color code isn't in the file; the color is cleared when importing.", stops: false)) }
         if !f.hasNotes, !f.notes.isEmpty { r.problems.append(Problem(place: where_, text: "It has notes but isn't marked as having notes; the notes are dropped when importing.", stops: false)) }
         for b in f.bookmarks {
             r.bookmarks += 1
-            let bw = (here + [b.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "(no name)" : b.name]).joined(separator: " › ")
-            if b.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { r.problems.append(Problem(place: bw, text: "This bookmark has no name.", stops: true)) }
+            let bw = (here + [Library.isBlank(b.name) ? "(no name)" : b.name]).joined(separator: " › ")
+            if Library.isBlank(b.name) { r.problems.append(Problem(place: bw, text: "This bookmark has no name.", stops: true)) }
             if !ids.insert(b.id).inserted { r.problems.append(Problem(place: bw, text: "Its id is used twice in the file.", stops: true)) }
             if b.url.trimmingCharacters(in: .whitespaces).isEmpty {
                 if !b.hasSecret { r.problems.append(Problem(place: bw, text: "This bookmark has no address and no secret.", stops: true)) }

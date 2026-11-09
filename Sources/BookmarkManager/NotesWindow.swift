@@ -97,11 +97,14 @@ enum NotesWindows {
         let textChanged = holder.item.notes != item.notes
         holder.item = item
         w.title = "Notes · \(item.name)"
-        if textChanged, !holder.editing, let content = w.contentView, content.frame.size == holder.fitted {
-            let size = fittedSize(for: item.notes, screen: screenSize(), size: holder.textSize)
-            w.setContentSize(size)
-            holder.fitted = size
-        }
+        if textChanged, !holder.editing { refit(item.id) }
+    }
+    /// The window fits its text again — unless it was resized by hand (then its size is its owner's).
+    static func refit(_ id: UUID) {
+        guard let w = windows[id], let holder = holders[id], let content = w.contentView, content.frame.size == holder.fitted else { return }
+        let size = fittedSize(for: holder.item.notes, screen: screenSize(), size: holder.textSize)
+        w.setContentSize(size)
+        holder.fitted = size
     }
 
     /// ⌘+ ⌘− ⌘0 in a notes window (Matt, Nov 8 2026): the text size of that one window, two points a step;
@@ -212,9 +215,12 @@ final class NotesHolder: ObservableObject {
     @discardableResult
     func save() -> Bool {
         guard let model else { return false }
+        let before = item.notes
         guard model.saveNotes(item.id, draft) else { return false }
         if let saved = model.notesItem(item.id) { item = saved }
         editing = false
+        // the refresh during the save saw the window still editing and left its size alone (review, Nov 8 2026)
+        if item.notes != before { NotesWindows.refit(item.id) }
         return true
     }
 }
@@ -319,8 +325,11 @@ struct NotesText: NSViewRepresentable {
             if tv.font != font { tv.font = font; tv.textStorage?.addAttribute(.font, value: font, range: NSRange(location: 0, length: tv.textStorage?.length ?? 0)) }
             if wasReading { DispatchQueue.main.async { tv.window?.makeFirstResponder(tv); tv.setSelectedRange(NSRange(location: tv.string.utf16.count, length: 0)) } }
         } else {
+            let wasEditing = tv.isEditable
             tv.isEditable = false; tv.isSelectable = true
-            if tv.string != shown || context.coordinator.lastMuted != muted || context.coordinator.lastFont != font {
+            // back from editing, the plain text is re-linked even when it reads the same (review, Nov 8 2026: the
+            // addresses used to stay plain after Cancel or Save until the window was reopened)
+            if wasEditing || tv.string != shown || context.coordinator.lastMuted != muted || context.coordinator.lastFont != font {
                 tv.textStorage?.setAttributedString(NotesText.linked(shown, muted: muted, font: font))
                 context.coordinator.lastMuted = muted; context.coordinator.lastFont = font
             }

@@ -176,7 +176,7 @@ struct HideAfterRow: View {
     var body: some View {
         LabeledContent("Hide a secret window after") {
             HStack(spacing: 8) {
-                PlainTextField("", text: $text, monospaced: true, label: "Seconds before a secret window hides").frame(width: 76)
+                PlainTextField("", text: $text, monospaced: true, label: "Seconds before a secret window hides", onEnd: { commit() }).frame(width: 76)
                     .disabled(never).opacity(never ? 0.5 : 1)
                 Stepper("", value: Binding(get: { model.settings.secretHideSeconds }, set: { set($0) }), in: AppSettings.hideSecondsRange).labelsHidden().disabled(never)
                 Text("seconds").foregroundStyle(never ? .secondary : .primary)
@@ -191,7 +191,6 @@ struct HideAfterRow: View {
             if let n = Int(digits), AppSettings.hideSecondsRange.contains(n), n != model.settings.secretHideSeconds { shown = n; model.settings.secretHideSeconds = n }
         }
         .onDisappear { commit() }
-        .onSubmit { commit() }
         Toggle("Never hide it by itself", isOn: Binding(get: { never }, set: { on in
             if on { if model.settings.secretHideSeconds > 0 { beforeNever = model.settings.secretHideSeconds }; set(0) }
             else { set(beforeNever > 0 ? beforeNever : AppSettings.defaultHideSeconds) }
@@ -421,10 +420,11 @@ struct TransferPane: View {
 
     private func finish(_ r: ValidationResult, mode: ImportMode) {
         guard let f = r.file else { return }
-        let notes = model.importFile(f, mode: mode)
+        result = nil
+        // nil: the save was refused — the notice says why; the pane must not say it was imported (review, Nov 8 2026)
+        guard let notes = model.importFile(f, mode: mode) else { message = "Nothing was imported from \(r.url.lastPathComponent): the library could not be saved."; messageIsProblem = true; return }
         message = (mode == .replace ? "Imported \(r.url.lastPathComponent), replacing what was here. " : "Imported \(r.url.lastPathComponent). ") + notes.joined(separator: " ")
         messageIsProblem = false
-        result = nil
     }
 }
 

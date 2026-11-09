@@ -106,7 +106,7 @@ struct LinkReportView: View {
                 if b != nil {
                     // the list stays open (Matt, Nov 8 2026): the main window comes forward beside it
                     Button("Show in place") { model.reveal(bookmark: p.bookmarkId); ReportWindows.frontMain() }.controlSize(.small).fixedSize()
-                    Button("Edit…") { if let b { model.sheet = .editBookmark(b) }; ReportWindows.frontMain() }.controlSize(.small).fixedSize()
+                    Button("Edit…") { if let b { ReportWindows.edit(b, model: model) } }.controlSize(.small).fixedSize()
                     // Matt, Oct 30 2026: a site may complain and still be wanted — clear the mark, once or for good
                     Menu("Clear") {
                         Button("Clear this mark") { model.clearLinkProblem(p.bookmarkId, forever: false) }

@@ -76,8 +76,8 @@ final class BackupReviewModelTests: XCTestCase {
         m.importFileForTest(Sample.library())
         try m.setBackupPassphrase("sierra nevada 1987")
         XCTAssertFalse(m.backupPassphraseStale)
-        try Data("garbage".utf8).write(to: m.store.secrets.dataURL)
-        let again = model()   // the key was moved aside with the unreadable secrets
+        try Data("garbage".utf8).write(to: m.store.secrets.keyURL)
+        let again = model()   // a damaged key is moved aside with the secrets it can't open (a damaged secrets file alone keeps the key — review 3)
         var b = try XCTUnwrap(again.library.allBookmarks.first { $0.name == "Webull" })
         b.secret = "acct 456"; again.updateBookmark(b)   // a new key is made
         XCTAssertTrue(again.backupPassphraseStale)

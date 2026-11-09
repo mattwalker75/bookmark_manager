@@ -60,8 +60,9 @@ final class StoreTests: XCTestCase {
 
     func testHomeFollowsTheEnvironment() {
         let s = Scratch()
+        let before = getenv("BOOKMARKMANAGER_HOME").map { String(cString: $0) }
         setenv("BOOKMARKMANAGER_HOME", s.path, 1)
-        defer { unsetenv("BOOKMARKMANAGER_HOME") }
+        defer { if let before { setenv("BOOKMARKMANAGER_HOME", before, 1) } else { unsetenv("BOOKMARKMANAGER_HOME") } }
         XCTAssertEqual(Home.folder().standardizedFileURL.path, s.url.standardizedFileURL.path)
     }
 }

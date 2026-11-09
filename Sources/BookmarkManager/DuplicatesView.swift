@@ -86,7 +86,7 @@ struct DuplicatesView: View {
             ForEach(g.bookmarkIds, id: \.self) { id in
                 if let b = model.library.bookmark(id) {
                     Divider().padding(.leading, 60)
-                    DuplicateRow(bookmark: b, showAddress: !g.exact, dimmed: g.allKept)
+                    DuplicateRow(bookmark: b, showAddress: !g.exact, dimmed: g.allKept, others: g.bookmarkIds.count - 1)
                 }
             }
         }
@@ -99,6 +99,8 @@ struct DuplicateRow: View {
     let bookmark: Bookmark
     let showAddress: Bool
     let dimmed: Bool
+    /// how many other bookmarks the group holds (for the delete question's wording)
+    let others: Int
     @State private var confirmDelete = false
 
     var body: some View {
@@ -120,7 +122,7 @@ struct DuplicateRow: View {
             Spacer(minLength: 8)
             // the list stays open (Matt, Nov 8 2026): the main window comes forward beside it
             Button("Show in place") { model.reveal(bookmark: bookmark.id); ReportWindows.frontMain() }.controlSize(.small).fixedSize()
-            Button("Edit…") { model.sheet = .editBookmark(bookmark); ReportWindows.frontMain() }.controlSize(.small).fixedSize()
+            Button("Edit…") { ReportWindows.edit(bookmark, model: model) }.controlSize(.small).fixedSize()
             Button("Delete…") { confirmDelete = true }.controlSize(.small).fixedSize()
         }
         .padding(.horizontal, 12).padding(.vertical, 8).padding(.leading, 12)
@@ -128,7 +130,7 @@ struct DuplicateRow: View {
         .confirmationDialog("Delete the bookmark “\(bookmark.name)”?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete") { model.deleteBookmark(bookmark.id) }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
-        } message: { Text((bookmark.hasSecret ? "Its secret goes with it. " : "") + "The other bookmark\(showAddress ? "" : "s") at this page \(showAddress ? "stays" : "stay"). This can't be undone.") }
+        } message: { Text((bookmark.hasSecret ? "Its secret goes with it. " : "") + "The other bookmark\(others == 1 ? "" : "s") at this page \(others == 1 ? "stays" : "stay"). This can't be undone.") }
     }
 
     /// From the Settings window, the main window comes forward to show the row or the editor.

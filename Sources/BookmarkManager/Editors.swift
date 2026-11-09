@@ -24,6 +24,7 @@ struct BookmarkEditor: View {
     @State private var problem: String?
     @State private var confirmDelete = false
     @State private var confirmDeleteNotes = false
+    @State private var confirmDeleteSecret = false
     /// the bookmark as the editor opened it (nil when new): only what differs from it is saved, over the bookmark
     /// as it is by then — notes saved from the notes window or an address taken from the link check while this
     /// sheet was open are kept (review, Nov 8 2026)
@@ -83,7 +84,12 @@ struct BookmarkEditor: View {
                 LabeledContent("Color") { ColorPills(selection: $bookmark.colorId) }
                 DestinationPicker(title: "In", selection: $destination)
                 Section {
-                    if kind == .web { Toggle("This bookmark has a secret", isOn: $bookmark.hasSecret) }
+                    // off with text asks first, like the notes (review, Nov 8 2026)
+                    if kind == .web {
+                        Toggle("This bookmark has a secret", isOn: Binding(get: { bookmark.hasSecret }, set: { on in
+                            if !on, !bookmark.secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { confirmDeleteSecret = true } else { bookmark.hasSecret = on }
+                        }))
+                    }
                     else { Text("The secret").fontWeight(.semibold) }
                     if kind == .secretOnly || bookmark.hasSecret {
                         TextBox(text: $bookmark.secret, placeholder: kind == .secretOnly ? "the passphrase, the PIN, a recovery code — as many lines as you like" : "user name on one line, password on the next, blank lines between…", minLines: 4, maxLines: 10, label: "The secret")
@@ -121,6 +127,10 @@ struct BookmarkEditor: View {
             Button("Delete") { model.deleteBookmark(bookmark.id); dismiss() }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
         } message: { Text(bookmark.hasSecret ? "Its secret goes with it." : "This can't be undone.") }
+        .confirmationDialog("Delete the secret for “\(bookmark.name)”?", isPresented: $confirmDeleteSecret, titleVisibility: .visible) {
+            Button("Delete secret") { bookmark.hasSecret = false; bookmark.secret = "" }
+            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+        } message: { Text("Turning the secret off throws its text away when you save. The bookmark itself stays.") }
         .confirmationDialog("Delete the notes for “\(bookmark.name)”?", isPresented: $confirmDeleteNotes, titleVisibility: .visible) {
             Button("Delete notes") { bookmark.hasNotes = false; bookmark.notes = "" }
             Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
@@ -132,8 +142,9 @@ struct BookmarkEditor: View {
         b.tags = Bookmark.parseTags(tagsText)
         if kind == .secretOnly {
             b.url = ""; b.hasSecret = true; b.browser = nil
-            // a brand-new secret with nothing typed would be an empty row (an imported one may be blank until retyped)
-            if isNew, b.secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { problem = "Type the secret first — a secret-only item with no text would be empty."; return }
+            // a secret with nothing typed would be an empty row — new, or a web bookmark just switched over (an
+            // imported one that already carried a blank secret may stay blank until retyped)
+            if seed?.hasSecret != true, b.secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { problem = "Type the secret first — a secret-only item with no text would be empty."; return }
         }
         if let seed, let now = model.library.bookmark(b.id) { b = now.applyingEdits(b, since: seed) }
         // try it on a copy first, so a refusal shows here instead of closing the sheet
@@ -369,7 +380,8 @@ struct TabNameSheet: View {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(tab == nil ? "Add tab" : "Rename") {
-                    guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { problem = "The tab needs a name."; return }
+                    // tried on a copy first, with the library's own rule, so a refusal shows here (review, Nov 8 2026)
+                    if let why = model.reason({ lib in if let t = tab { try lib.renameTab(t.id, name) } else { _ = try lib.addTab(name) } }) { problem = why; return }
                     if let t = tab { model.renameTab(t.id, name) } else { model.addTab(name) }
                     dismiss()
                 }
