@@ -249,6 +249,9 @@ extension Transfer {
     /// A browser's bookmarks file as a NEW tab beside the current ones (Matt, Nov 8 2026). The directory levels
     /// are raised when the file's folders go deeper (up to the most allowed); anything deeper still is folded into
     /// the directory above it. Returns the library, sentences for the user, and the new tab's id.
+    /// The one thing `importBrowser` refuses, checked on its own (for the sheet, before the import is run once).
+    public static func checkTabName(_ tabName: String) throws { _ = try Library.cleanName(tabName, what: "tab") }
+
     public static func importBrowser(_ file: BrowserBookmarks.File, tabName: String, into current: Library) throws -> (library: Library, notes: [String], tabId: UUID) {
         let name = try Library.cleanName(tabName, what: "tab")
         var lib = current

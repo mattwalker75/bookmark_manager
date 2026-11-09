@@ -75,8 +75,9 @@ struct BrowserImportSheet: View {
     }
 
     private func add() {
-        // the refusal (a blank name) is shown here, in the sheet, not as a notice behind it
-        do { _ = try Transfer.importBrowser(file, tabName: tabName, into: model.library) }
+        // the refusal (a blank name) is shown here, in the sheet, not as a notice behind it — checked on its own,
+        // so the import is built once, not twice (review, Nov 8 2026)
+        do { try Transfer.checkTabName(tabName) }
         catch { problem = (error as? BMError)?.message ?? error.localizedDescription; return }
         // nil: it didn't happen (the save failed, say) — the notice behind the sheet says why, so the sheet goes
         // away and the Settings pane is NOT told it was imported

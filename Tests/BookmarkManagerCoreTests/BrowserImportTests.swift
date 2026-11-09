@@ -144,6 +144,7 @@ final class BrowserImportTests: XCTestCase {
         let ok = try Transfer.importBrowser(f, tabName: "  Mine ", into: fits)
         XCTAssertEqual(ok.library.maxDepth, 4); XCTAssertEqual(ok.library.tabs.last?.name, "Mine"); XCTAssertFalse(ok.notes.contains { $0.contains("raised") })
         XCTAssertThrowsBM(try Transfer.importBrowser(f, tabName: "  ", into: fits), containing: "needs a name")
+        XCTAssertThrowsBM(try Transfer.checkTabName(" "), containing: "needs a name"); XCTAssertNoThrow(try Transfer.checkTabName(" Mine "))
     }
 
     /// 1.2.1: a description after a link that was left out (a bookmarklet, say) is dropped, not hung on the kept

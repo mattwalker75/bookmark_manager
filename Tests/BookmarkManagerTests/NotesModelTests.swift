@@ -110,6 +110,23 @@ final class NotesModelTests: XCTestCase {
         XCTAssertFalse(NotesWindows.isOpen(only.id), "gone with the directory")
     }
 
+    /// Review, Nov 8 2026: an editor that was open while the notes window saved (or the link check took a new
+    /// address) saves only what it changed, over the bookmark as it is by then.
+    func testAnEditorLaysOnlyItsChangesOverTheBookmarkAsItIsNow() throws {
+        let seed = Bookmark(name: "Old name", description: "d", url: "https://old.example/", tags: ["a"], hasNotes: true, notes: "first")
+        var now = seed; now.url = "https://new.example/"; now.notes = "saved from the window"; now.notesEditedAt = Date(); now.skipLinkCheck = true
+        var edited = seed; edited.name = "New name"; edited.tags = ["a", "b"]
+        let merged = now.applyingEdits(edited, since: seed)
+        XCTAssertEqual(merged.name, "New name"); XCTAssertEqual(merged.tags, ["a", "b"], "the editor's changes land")
+        XCTAssertEqual(merged.url, "https://new.example/"); XCTAssertEqual(merged.notes, "saved from the window"); XCTAssertNotNil(merged.notesEditedAt); XCTAssertTrue(merged.skipLinkCheck, "what changed elsewhere stays")
+        // the editor turned the notes off: that wins over the window's save
+        var off = seed; off.hasNotes = false; off.notes = ""
+        let merged2 = now.applyingEdits(off, since: seed)
+        XCTAssertFalse(merged2.hasNotes); XCTAssertEqual(merged2.notes, "")
+        // nothing edited at all: the bookmark as it is now, untouched
+        XCTAssertEqual(now.applyingEdits(seed, since: seed), now)
+    }
+
     func testTheKeyboardAndTheSearchReachNotes() throws {
         let m = model()
         let pm = try XCTUnwrap(m.library.allBookmarks.first { $0.name == "People Manager" })

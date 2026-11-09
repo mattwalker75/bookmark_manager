@@ -24,9 +24,14 @@ struct BookmarkEditor: View {
     @State private var problem: String?
     @State private var confirmDelete = false
     @State private var confirmDeleteNotes = false
+    /// the bookmark as the editor opened it (nil when new): only what differs from it is saved, over the bookmark
+    /// as it is by then — notes saved from the notes window or an address taken from the link check while this
+    /// sheet was open are kept (review, Nov 8 2026)
+    private let seed: Bookmark?
 
     init(bookmark: Bookmark?, path: FolderPath, secretOnly: Bool = false) {
         isNew = bookmark == nil
+        seed = bookmark
         let b = bookmark ?? Bookmark(name: "", url: "", hasSecret: secretOnly)
         _kind = State(initialValue: (bookmark?.isSecretOnly ?? secretOnly) ? .secretOnly : .web)
         _bookmark = State(initialValue: b)
@@ -130,6 +135,7 @@ struct BookmarkEditor: View {
             // a brand-new secret with nothing typed would be an empty row (an imported one may be blank until retyped)
             if isNew, b.secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { problem = "Type the secret first — a secret-only item with no text would be empty."; return }
         }
+        if let seed, let now = model.library.bookmark(b.id) { b = now.applyingEdits(b, since: seed) }
         // try it on a copy first, so a refusal shows here instead of closing the sheet
         var trial = model.library
         do {
@@ -266,12 +272,17 @@ struct FolderEditor: View {
     @State private var problem: String?
     @State private var confirmDelete = false
     @State private var confirmDeleteNotes = false
+    /// the directory as the editor opened it (nil when new): notes it didn't touch are left as they are by then,
+    /// so notes saved from the notes window while this sheet was open are kept (review, Nov 8 2026)
+    private let seed: Folder?
 
     init(folder: Folder?, path: FolderPath) {
         isNew = folder == nil
         self.path = path
+        seed = folder
         _folder = State(initialValue: folder ?? Folder(name: ""))
     }
+    private var notesTouched: Bool { seed.map { $0.hasNotes != folder.hasNotes || $0.notes != folder.notes } ?? true }
 
     private var level: Int { isNew ? path.depth + 1 : path.depth }
 
@@ -320,10 +331,10 @@ struct FolderEditor: View {
         var trial = model.library
         do {
             if isNew { _ = try trial.addFolder(name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: folder.hasNotes, notes: folder.notes, in: path) }
-            else { try trial.updateFolder(folder.id, name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: folder.hasNotes, notes: folder.notes) }
+            else { try trial.updateFolder(folder.id, name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: notesTouched ? folder.hasNotes : nil, notes: notesTouched ? folder.notes : nil) }
         } catch { problem = (error as? BMError)?.message ?? error.localizedDescription; return }
         if isNew { model.addFolder(name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: folder.hasNotes, notes: folder.notes, in: path) }
-        else { model.updateFolder(folder.id, name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: folder.hasNotes, notes: folder.notes) }
+        else { model.updateFolder(folder.id, name: folder.name, description: folder.description, colorId: folder.colorId, hasNotes: notesTouched ? folder.hasNotes : nil, notes: notesTouched ? folder.notes : nil) }
         dismiss()
     }
 
@@ -424,5 +435,19 @@ extension Folder {
         hasNotes && !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? "It has no bookmarks or directories inside it, but it has notes — they are deleted with it."
             : "It is empty, so nothing else is lost."
+    }
+}
+
+extension Bookmark {
+    /// This bookmark (as it is now) with the editor's changes laid over it: every field where `edited` differs from
+    /// `seed` (what the editor opened with) is taken from `edited`; the rest stays as it is now. So a sheet that
+    /// was open while the notes window saved notes, or the link check took a new address, overwrites neither.
+    func applyingEdits(_ edited: Bookmark, since seed: Bookmark) -> Bookmark {
+        var out = self
+        func take<T: Equatable>(_ k: WritableKeyPath<Bookmark, T>) { if edited[keyPath: k] != seed[keyPath: k] { out[keyPath: k] = edited[keyPath: k] } }
+        take(\.name); take(\.description); take(\.url); take(\.tags); take(\.colorId)
+        take(\.hasSecret); take(\.secret); take(\.browser); take(\.skipLinkCheck); take(\.skipDuplicateCheck)
+        take(\.hasNotes); take(\.notes)
+        return out
     }
 }

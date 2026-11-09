@@ -4,6 +4,14 @@ All notable changes to Bookmark Manager (Keep a Changelog style; dates are when 
 
 ## [Unreleased]
 
+### Fixed
+- 2026-11-08: **An editor left open overwrote changes made elsewhere** — the bookmark editor saved the whole
+  bookmark as it opened it, so notes saved from the notes window, or a new address taken in the link check, while
+  the sheet was open were put back on Save; the directory editor did the same to its notes. Both now save only
+  what was changed in them, over the item as it is by then.
+- 2026-11-08: The import-from-a-browser sheet built the new tab twice (once to check the name). It checks the
+  name on its own now.
+
 ### Changed
 - 2026-11-08: **The link-check results and the duplicates list are windows of their own** (Matt) — they were
   sheets, so *Show in place* and *Edit…* had to close them to reach the main window and the list had to be opened
