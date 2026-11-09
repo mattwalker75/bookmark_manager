@@ -1,11 +1,13 @@
-// The link check on screen: the sheet with its progress and then its problems (gone / moved / didn't answer),
-// and the banner above the list after a scheduled check found something.
+// The link check on screen: the window (`ReportWindows`) with its progress and then its problems (gone / moved /
+// didn't answer), and the banner above the list after a scheduled check found something. The window stays open
+// while you work from it — Show in place and Edit… bring the main window forward and leave the list where it is.
 import SwiftUI
 import BookmarkManagerCore
 
-struct LinkReportSheet: View {
+struct LinkReportView: View {
     @EnvironmentObject var model: AppModel
-    @Environment(\.dismiss) private var dismiss
+    /// closes the window (Done)
+    let close: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -18,13 +20,13 @@ struct LinkReportSheet: View {
             Spacer(minLength: 0)
             HStack(spacing: 8) {
                 if model.linkCheckRunning { Button("Stop") { model.cancelLinkCheck() } }
-                else { Button("Check again") { model.checkLinks(inMainWindow: false) } }
+                else { Button("Check again") { model.checkLinks() } }
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                Button("Done") { close() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
             }
         }
         .padding(20)
-        .frame(width: 820, height: 600)
+        .frame(minWidth: ReportWindows.floor.width, maxWidth: .infinity, minHeight: ReportWindows.floor.height, maxHeight: .infinity)
     }
 
     private func progress(_ p: LinkCheckProgress) -> some View {
@@ -102,8 +104,9 @@ struct LinkReportSheet: View {
                 Text(p.verdict.text).font(DS.secondary).foregroundStyle(color(p.verdict.group))
                     .padding(.horizontal, 8).padding(.vertical, 2).background(color(p.verdict.group).opacity(0.14), in: Capsule()).fixedSize()
                 if b != nil {
-                    Button("Show in place") { dismiss(); model.reveal(bookmark: p.bookmarkId); front() }.controlSize(.small).fixedSize()
-                    Button("Edit…") { dismiss(); if let b { model.sheet = .editBookmark(b) }; front() }.controlSize(.small).fixedSize()
+                    // the list stays open (Matt, Nov 8 2026): the main window comes forward beside it
+                    Button("Show in place") { model.reveal(bookmark: p.bookmarkId); ReportWindows.frontMain() }.controlSize(.small).fixedSize()
+                    Button("Edit…") { if let b { model.sheet = .editBookmark(b) }; ReportWindows.frontMain() }.controlSize(.small).fixedSize()
                     // Matt, Oct 30 2026: a site may complain and still be wanted — clear the mark, once or for good
                     Menu("Clear") {
                         Button("Clear this mark") { model.clearLinkProblem(p.bookmarkId, forever: false) }
@@ -142,7 +145,6 @@ struct LinkReportSheet: View {
         Browsers.open(u, with: model.settings.browser) { _ in }
     }
     /// From the Settings window, the main window comes forward to show the row.
-    private func front() { NSApp.windows.first { $0.identifier?.rawValue == "main" }?.makeKeyAndOrderFront(nil) }
 }
 
 /// Above the list after a scheduled check: "3 addresses didn't answer when checked on Monday — Show".
@@ -154,7 +156,7 @@ struct LinkBanner: View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.attention)
             Text("\(n) address\(n == 1 ? "" : "es") didn't answer as expected when checked \(report.checkedAt.formatted(.relative(presentation: .named))).").lineLimit(1)
-            Button("Show") { model.sheet = .linkReport; model.dismissLinkBanner() }.controlSize(.small)
+            Button("Show") { model.showLinkReport(); model.dismissLinkBanner() }.controlSize(.small)
             Spacer()
             Button { model.dismissLinkBanner() } label: { Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)) }.buttonStyle(.plain).foregroundStyle(.secondary).help("Put this away (the marks stay on the rows)").accessibilityLabel("Dismiss")
         }

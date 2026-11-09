@@ -17,14 +17,8 @@ enum MainSheet: Identifiable {
     case renameTab(Folder)
     /// Move to…: choose where a bookmark or directory goes
     case move(DragItem)
-    /// the link check: its progress, then its problems
-    case linkReport
-    /// the duplicates: every group of bookmarks at the same page (Matt, Nov 8 2026)
-    case duplicates
     var id: String {
         switch self {
-        case .linkReport: return "linkReport"
-        case .duplicates: return "duplicates"
         case .newBookmark(let p): return "newBookmark-\(p)"
         case .newSecret(let p): return "newSecret-\(p)"
         case .editBookmark(let b): return "editBookmark-\(b.id)"
@@ -129,11 +123,10 @@ final class AppModel: ObservableObject {
         return now.timeIntervalSince(last) >= TimeInterval(settings.linkCheckDays) * 86_400
     }
 
-    /// Checks every address (or one directory's). `automatic` = run by the schedule: no sheet, a banner instead.
-    /// `inMainWindow` = false when Settings shows the sheet itself.
-    func checkLinks(in path: FolderPath? = nil, automatic: Bool = false, inMainWindow: Bool = true) {
+    /// Checks every address (or one directory's). `automatic` = run by the schedule: no window, a banner instead.
+    func checkLinks(in path: FolderPath? = nil, automatic: Bool = false) {
         guard linkTask == nil else {
-            if !automatic { linkManualAsked = true; if inMainWindow { sheet = .linkReport } }
+            if !automatic { linkManualAsked = true; showLinkReport() }
             return
         }
         let bookmarks = path.flatMap { library.folder(at: $0) }?.allBookmarks ?? library.allBookmarks
@@ -142,7 +135,7 @@ final class AppModel: ObservableObject {
         linkProgress = LinkCheckProgress(total: items.count)
         linkNote = nil
         linkManualAsked = !automatic
-        if !automatic, inMainWindow { sheet = .linkReport }
+        if !automatic { showLinkReport() }
         let started = Date()
         linkTask = Task { [weak self] in
             let found = await LinkChecker.check(items) { [weak self] n in self?.linkProgress?.done = n }
@@ -174,6 +167,10 @@ final class AppModel: ObservableObject {
         }
     }
     func cancelLinkCheck() { linkTask?.cancel() }
+    /// The link check's results in their own window (Matt, Nov 8 2026: it stays open while you work from it).
+    func showLinkReport() { ReportWindows.show(.links, model: self) }
+    /// The duplicates in their own window, likewise.
+    func showDuplicates() { ReportWindows.show(.duplicates, model: self) }
     func dismissLinkBanner() { linkReport?.bannerDismissed = true; linkReport?.save(in: store.folder) }
     /// "Use new address" on a moved bookmark.
     func useNewAddress(_ r: LinkResult) {

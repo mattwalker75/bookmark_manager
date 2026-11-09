@@ -45,8 +45,6 @@ struct MainWindow: View {
             case .newTab: TabNameSheet(tab: nil)
             case .renameTab(let t): TabNameSheet(tab: t)
             case .move(let item): MoveSheet(item: item)
-            case .linkReport: LinkReportSheet()
-            case .duplicates: DuplicatesSheet()
             }
         }
         .alert(item: $model.notice) { n in Alert(title: Text(n.title), message: Text(n.message), dismissButton: .default(Text("OK"))) }
@@ -79,7 +77,7 @@ struct MainWindow: View {
             case "secret": if let b { model.showSecret(b) }
             case "notes": if let n = model.library.allBookmarks.first(where: \.hasNotes) { model.showNotes(n) }
             case "linkcheck": model.checkLinks()
-            case "duplicates": model.sheet = .duplicates
+            case "duplicates": model.showDuplicates()
             case "backupcheck":
                 // the Verify sheet for the newest backup, in a window of its own (there is one: the launch wrote it)
                 model.refreshBackups()
@@ -90,12 +88,12 @@ struct MainWindow: View {
                     w.makeKeyAndOrderFront(nil)
                 }
             case "linkreport", "linkreport:sheet":
-                // a made-up report over the sample, so the marks, the banner and the sheet can be looked at without the network
+                // a made-up report over the sample, so the marks, the banner and the results window can be looked at without the network
                 func r(_ name: String, _ v: LinkVerdict) -> LinkResult? { model.library.allBookmarks.first { $0.name == name }.map { LinkResult(bookmarkId: $0.id, url: $0.url, verdict: v) } }
                 let problems = [r("Router status", .gone(code: 404)), r("GitHub organization settings", .gone(code: 410)), r("Swift forums", .moved(to: "https://forums.swift.org/latest")),
                                 r("Mac mini dashboard", .unreachable("Nothing answering there")), r("UniFi controller", .unreachable("Timed out")), r("Bank", .refused(code: 403))].compactMap { $0 }
                 model.linkReport = LinkReport(checkedAt: Date().addingTimeInterval(-86_400 * 2), checked: model.library.allBookmarks.count, problems: problems, automatic: true, seconds: 41)
-                if sheet.hasSuffix(":sheet") { model.sheet = .linkReport }
+                if sheet.hasSuffix(":sheet") { model.showLinkReport() }
             default:
                 if sheet.hasPrefix("secret:"), let b = model.library.allBookmarks.first(where: { $0.name.hasPrefix(String(sheet.dropFirst(7))) }) { model.showSecret(b) }
                 if sheet.hasPrefix("notes:") {   // a bookmark's notes, or a directory's

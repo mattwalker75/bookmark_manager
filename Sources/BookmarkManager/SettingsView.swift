@@ -26,8 +26,6 @@ struct GeneralPane: View {
     @State private var browsers: [Browser] = []
     @State private var depth = 2
     @State private var depthProblem: String?
-    @State private var showLinkReport = false
-    @State private var showDuplicates = false
 
     var body: some View {
         Form {
@@ -78,10 +76,10 @@ struct GeneralPane: View {
             }
             Section("Links") {
                 HStack(spacing: 10) {
-                    Button("Check every address…") { model.checkLinks(inMainWindow: false); showLinkReport = true }.disabled(model.linkCheckRunning)
+                    Button("Check every address…") { model.checkLinks() }.disabled(model.linkCheckRunning)
                     if model.linkCheckRunning { ProgressView().controlSize(.small) }
                     Spacer()
-                    if model.linkReport != nil { Button("Last results…") { showLinkReport = true } }
+                    if model.linkReport != nil { Button("Last results…") { model.showLinkReport() } }
                 }
                 Text(lastCheckText).font(DS.secondary).foregroundStyle(.secondary)
                 Picker("Check all addresses on their own", selection: $model.settings.linkCheckDays) {
@@ -93,11 +91,11 @@ struct GeneralPane: View {
             // under the "Links" heading with the link check and the site icons (Matt, Nov 8 2026): a card of its own, no title
             Section {
                 HStack(spacing: 10) {
-                    Button("Find duplicate bookmarks…") { showDuplicates = true }
+                    Button("Find duplicate bookmarks…") { model.showDuplicates() }
                     Spacer()
                     Text(duplicatesText).font(DS.secondary).foregroundStyle(.secondary).lineLimit(1)
                 }
-                Text("Finds bookmarks that point at the same page — the same address, or one written a little differently (with or without www, a trailing slash, tracking bits). Nothing is deleted by itself: a sheet lists each group with where its bookmarks live. Mark a group as meant to be the same (several Gmail accounts, say) and it is left out from then on — undo that in the bookmark's editor.")
+                Text("Finds bookmarks that point at the same page — the same address, or one written a little differently (with or without www, a trailing slash, tracking bits). Nothing is deleted by itself: a window lists each group with where its bookmarks live, and stays open while you work from it. Mark a group as meant to be the same (several Gmail accounts, say) and it is left out from then on — undo that in the bookmark's editor.")
                     .font(DS.secondary).foregroundStyle(.secondary)
             }
             Section {
@@ -118,8 +116,6 @@ struct GeneralPane: View {
         .formStyle(.grouped)
         .onAppear { browsers = Browsers.installed(); depth = model.library.maxDepth }
         .onChange(of: model.library.maxDepth) { _, d in depth = d }
-        .sheet(isPresented: $showLinkReport) { LinkReportSheet().environmentObject(model) }
-        .sheet(isPresented: $showDuplicates) { DuplicatesSheet().environmentObject(model).environmentObject(model.icons) }
     }
 
     /// "2 groups right now (5 bookmarks)" — worked out live; the library is small and this costs nothing

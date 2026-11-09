@@ -29,8 +29,9 @@ it is not a developer: every message is a plain sentence.
   TabNameSheet, MoveSheet, ColorPills, DestinationPicker, BrowserPicker), `SecretWindow` (one NSWindow per bookmark,
   self-sizing, hide timer), `NotesWindow` (the notes window for a bookmark OR a directory — `NotesItem`: read first, Edit, Save/Cancel, the two questions),
   `TextSize` (⌘+ ⌘− ⌘0 in secret / notes windows), `BrowserImportView` (the import-from-a-browser sheet),
-  `SecretGate` (Touch ID), `LinkCheck` + `LinkCheckView` (the link check and its sheet /
-  banner), `DuplicatesView` (the duplicates sheet), `SettingsView` (General, Color codes, Appearance, Backups, Export & import + ValidationSheet),
+  `SecretGate` (Touch ID), `LinkCheck` + `LinkCheckView` (the link check: `LinkReportView` + the
+  banner), `DuplicatesView` (`DuplicatesView` + `DuplicateRow`), `ReportWindows` (the link-check and duplicates lists are
+  WINDOWS of their own, one each, kept open while Show in place / Edit… bring the main window forward — Matt, Nov 8 2026), `SettingsView` (General, Color codes, Appearance, Backups, Export & import + ValidationSheet),
   `BackupsView` (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet), `Browsers`, `Icons` (IconCache +
   IconFetcher), `Sample`. `MainWindow` also holds `KeyboardDriver`, `TreeBranch`, `TreeRow`. The look is App Starter's / Data Syncer's: `Design.swift`, `Themes.swift`,
   `AppearancePane.swift`, `PlainTextField.swift` are adapted copies (Themes adds `RGB.color`, drops the bundle light;
@@ -148,7 +149,7 @@ it is not a developer: every message is a plain sentence.
     groups bookmarks by `duplicateKey` (no scheme, host lower-cased without www./default port, path without its
     trailing slash, query without tracking names — `utm_*`, fbclid… — sorted, no fragment; mailto:/tel: as typed;
     secret-only items never) → `DuplicateReport` (`exact` = letter for letter). NOTHING is deleted by itself; the
-    sheet (`DuplicatesSheet`, Settings → General under the Links heading — its own card, no title (Matt), the Bookmarks menu, the `duplicates` dev hook) works
+    window (`DuplicatesView` in `ReportWindows`; Settings → General under the Links heading — its own card, no title (Matt), the Bookmarks menu, the `duplicates` dev hook) works
     off the live library (no file). "Meant to be the same" = `Bookmark.skipDuplicateCheck` on every member
     (`setKeptAsDuplicates`; exported; the editor's "Leave out of duplicate checks" undoes one); a group is
     `allKept` (left out) only while EVERY member is marked, so a new bookmark at a marked page brings it back.

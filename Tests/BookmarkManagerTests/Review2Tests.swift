@@ -82,13 +82,13 @@ final class Review2Tests: XCTestCase {
         XCTAssertEqual(marked.count, 2)
         let work = lib.tabs[marked[0]]
         m.importFileForTest(lib)
-        m.checkLinks(inMainWindow: false)
+        m.checkLinks()
         while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
         let all = try XCTUnwrap(m.linkReport)
         XCTAssertEqual(all.problems.count, 2)
         XCTAssertTrue(all.summary.hasPrefix("2 of \(all.checked)"))
         // now only the Work tab: Home's mark stays, and the numbers still add up
-        m.checkLinks(in: FolderPath(tab: work.id), inMainWindow: false)
+        m.checkLinks(in: FolderPath(tab: work.id))
         while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
         let scoped = try XCTUnwrap(m.linkReport)
         XCTAssertEqual(Set(scoped.problems.map(\.bookmarkId)), Set(all.problems.map(\.bookmarkId)))

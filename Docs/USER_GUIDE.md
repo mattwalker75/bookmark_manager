@@ -138,16 +138,17 @@ hidden until you ask for it.
   **moved** (the site says it has a new address — it is shown in full under the row, *Open new…* lets you look at
   it in the browser first, *Use new address* puts it into the bookmark), and **didn't answer** (no such site,
   timed out, a server error, or a login page or robot block — those can still work fine in your browser). Show in
-  place and Edit… are right there.
+  place and Edit… are right there, and the list is a window of its own: it stays open while you go through the
+  bookmarks one by one, and closes with **Done** or its close button.
 - Right-click a directory → **Check links in this directory…** (or a tab → **Check links in this tab…**) does the
   same for just that part; the Bookmarks menu has **Check Links in This Directory…** and **Check Every Address…**.
-  The sheet has **Stop** while it runs and **Check again** after; Settings → General keeps **Last results…**.
+  The window has **Stop** while it runs and **Check again** after; Settings → General keeps **Last results…**.
 - The check reads only each page's headers, never the page; it follows a site's "moved" only to another web
   address, never from https down to plain http (that is reported as "Sent to an unencrypted address"), and never
   sends a password typed into an address. If nothing answers at all (no connection), the last results are kept.
 - After a check, a problem bookmark wears a small red mark on its icon and a red line under its name saying what
   happened and when. The mark goes when you edit the address or the next check finds it fine — or when you
-  **Clear** it in the sheet (or right-click the row → Clear link mark). Clear offers two things: clear this mark
+  **Clear** it in the list (or right-click the row → Clear link mark). Clear offers two things: clear this mark
   once, or clear it and **leave this bookmark out of link checks** from now on, for a site that always turns the
   check away but works fine in the browser. That switch is in the bookmark's editor too, so it can be undone.
 - **Check all addresses on their own** (Settings → General) is off unless you turn it on: once a week or once a
@@ -159,11 +160,12 @@ hidden until you ask for it.
   point at the same page, each with where it lives. Two kinds: **same address** (letter for letter) and **same
   page, written differently** — http or https, with or without www, a trailing slash, tracking bits after "?"
   (utm_…, fbclid and the like), a #part. Each row has Show in place, Edit… and Delete… (asked first). Nothing is
-  deleted by itself, and the sheet looks at the library as it is right now, so there is nothing to re-run.
+  deleted by itself, and the list looks at the library as it is right now, so there is nothing to re-run. It is a
+  window of its own that stays open while you work through the groups; **Done** closes it.
 - Some duplicates are meant: one bookmark per Gmail account, all at the same address. Click **Meant to be the
   same — keep all N** on the group and every bookmark in it is marked; the group is left out from then on. The
   mark is the **Leave out of duplicate checks** switch in each bookmark's editor, so it can be undone one by one;
-  the sheet's **Show the N left out** checkbox shows those groups dimmed, with **Look at these again** to unmark
+  the window's **Show the N left out** checkbox shows those groups dimmed, with **Look at these again** to unmark
   them all. If a new bookmark lands at a marked page later, the group shows again with the new one in it.
 - Secret-only items have no address, so they are never duplicates.
 

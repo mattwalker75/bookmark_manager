@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 @testable import BookmarkManager
 @testable import BookmarkManagerCore
 
@@ -50,8 +51,13 @@ final class DuplicatesModelTests: XCTestCase {
         XCTAssertFalse(hig.exact); XCTAssertEqual(hig.bookmarkIds.count, 2)
         m.deleteBookmark(hig.bookmarkIds[1])
         XCTAssertEqual(m.duplicates.shown.count, 2, "a page with one bookmark left is no duplicate")
-        m.sheet = .duplicates
-        XCTAssertEqual(m.sheet?.id, "duplicates")
+        // the list is a window of its own (Matt, Nov 8 2026); asking twice is one window, and it stays until closed
+        m.showDuplicates(); m.showDuplicates()
+        XCTAssertTrue(ReportWindows.isOpen(.duplicates)); XCTAssertEqual(NSApp.windows.filter { $0.title == "Duplicate bookmarks" }.count, 1)
+        m.sheet = .editBookmark(m.library.allBookmarks[0])
+        XCTAssertTrue(ReportWindows.isOpen(.duplicates), "opening an editor leaves the list open")
+        ReportWindows.close(.duplicates)
+        XCTAssertFalse(ReportWindows.isOpen(.duplicates))
         // the marks survive an export and come back with an import
         for g in m.duplicates.shown { m.keepDuplicates(g.bookmarkIds, true) }
         let data = try m.exportData(includeSecrets: false)

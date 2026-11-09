@@ -8,7 +8,7 @@ Sources/BookmarkManager/       BookmarkManagerApp (+ AppDelegate) · AppModel ·
                                FolderTree, TreeBranch, TreeRow, FolderDetail, SubfolderRow, BookmarkRow, SiteIcon, DropGap, EndDrop)
                                SearchResults · Editors (BookmarkEditor, BrowserPicker, ColorPills, DestinationPicker, FolderEditor,
                                TabNameSheet, MoveSheet) · SecretWindow · NotesWindow (NotesWindows, NotesHolder, NotesView, NotesText) · SecretGate (Touch ID) · LinkCheck (LinkVerdict, LinkReport,
-                               LinkChecker) · LinkCheckView (LinkReportSheet, LinkBanner) · DuplicatesView (DuplicatesSheet, DuplicateRow) · BrowserImportView (BrowserImportSheet) · TextSize (TextSizeKeys) · SettingsView (GeneralPane, TextSizeRow, HideAfterRow, ColorCodesPane,
+                               LinkChecker) · LinkCheckView (LinkReportView, LinkBanner) · DuplicatesView (DuplicatesView, DuplicateRow) · ReportWindows (the two lists as windows) · BrowserImportView (BrowserImportSheet) · TextSize (TextSizeKeys) · SettingsView (GeneralPane, TextSizeRow, HideAfterRow, ColorCodesPane,
                                TransferPane, ValidationSheet) · BackupsView (BackupsPane, BackupCheckSheet, KeepSheet, PassphraseSheet)
                                Browsers · Icons (IconCache, IconFetcher) · Sample
                                Design · Themes · AppearancePane · PlainTextField · TextBox   ← adapted from App Starter (Themes adds
@@ -114,7 +114,7 @@ with the library exactly as in library.json (plus the secrets when included).
   (`newSecret` opens the bookmark editor with Secret only picked; `secret:<name prefix>` opens that bookmark's secret
   window, e.g. `secret:Backup` for the long sample secret; `keys:125,125,36` posts those key codes to the main
   window like real presses — 125 ↓, 126 ↑, 36 Return, 49 Space). Several steps run a second apart when separated
-  by `;`: `search:admin;keys:125,125`. `linkreport` puts a made-up link report over the sample (marks + banner), `linkreport:sheet` also opens the sheet, `linkcheck` runs a real check (network!), `duplicates` opens the duplicates sheet (the sample holds two groups; the model test adds a third), `backupcheck` opens the Verify sheet for the newest backup in a window of its own.
+  by `;`: `search:admin;keys:125,125`. `linkreport` puts a made-up link report over the sample (marks + banner), `linkreport:sheet` also opens the results window, `linkcheck` runs a real check (network!), `duplicates` opens the duplicates window (the sample holds two groups; the model test adds a third), `backupcheck` opens the Verify sheet for the newest backup in a window of its own.
 
 Screenshots: run `.build/debug/BookmarkManager` with those variables, then `screencapture -x -l <window id>`
 (after `caffeinate -u -t 1`; the window ids from `CGWindowListCopyWindowInfo`, owner `BookmarkManager`).

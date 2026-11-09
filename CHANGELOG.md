@@ -2,6 +2,17 @@
 
 All notable changes to Bookmark Manager (Keep a Changelog style; dates are when the change was made).
 
+## [Unreleased]
+
+### Changed
+- 2026-11-08: **The link-check results and the duplicates list are windows of their own** (Matt) — they were
+  sheets, so *Show in place* and *Edit…* had to close them to reach the main window and the list had to be opened
+  again for every bookmark. Now each is one window (*Link check*, *Duplicate bookmarks*) that stays open beside the
+  main window while you work through it: Show in place and Edit… bring the main window forward and leave the list
+  where it is; **Done** or the close button closes it; asking again brings the same window forward. Resizable, and
+  it opens where it was left. Opened from Settings → General, the Bookmarks menu, right-click → Check links…, and
+  the banner's *Show*, all the same way.
+
 ## [1.2.1] — 2026-11-08
 
 Matt, Nov 8 2026: five of the findings from the code review of 1.2, fixed as one batch.

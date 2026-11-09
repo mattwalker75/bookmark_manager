@@ -1,13 +1,15 @@
-// The duplicates sheet (Matt, Nov 8 2026; mockup board "Duplicates sheet"): every group of bookmarks that point at
-// the same page, each bookmark with where it lives — Show in place, Edit…, Delete… (asked first) — and, per group,
-// "Meant to be the same" which marks every member so the group is left out from then on (undone in the editor,
-// or here under "Show the ones left out"). Nothing is changed unless a button is clicked.
+// The duplicates window (Matt, Nov 8 2026; mockup board "Duplicates sheet" — a window of its own since the same
+// day, see `ReportWindows`): every group of bookmarks that point at the same page, each bookmark with where it
+// lives — Show in place, Edit…, Delete… (asked first) — and, per group, "Meant to be the same" which marks every
+// member so the group is left out from then on (undone in the editor, or here under "Show the ones left out").
+// Nothing is changed unless a button is clicked. The window stays open while you work from it.
 import SwiftUI
 import BookmarkManagerCore
 
-struct DuplicatesSheet: View {
+struct DuplicatesView: View {
     @EnvironmentObject var model: AppModel
-    @Environment(\.dismiss) private var dismiss
+    /// closes the window (Done)
+    let close: () -> Void
     @State private var showKept = false
 
     var body: some View {
@@ -47,11 +49,11 @@ struct DuplicatesSheet: View {
                         .help("The groups marked as meant to be the same, dimmed, with a button to look at them again")
                 }
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                Button("Done") { close() }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
             }
         }
         .padding(20)
-        .frame(width: 820, height: 600)
+        .frame(minWidth: ReportWindows.floor.width, maxWidth: .infinity, minHeight: ReportWindows.floor.height, maxHeight: .infinity)
     }
 
     private func legend(_ c: Color, _ t: String) -> some View { HStack(spacing: 5) { Circle().fill(c).frame(width: 8, height: 8); Text(t) } }
@@ -84,7 +86,7 @@ struct DuplicatesSheet: View {
             ForEach(g.bookmarkIds, id: \.self) { id in
                 if let b = model.library.bookmark(id) {
                     Divider().padding(.leading, 60)
-                    DuplicateRow(bookmark: b, showAddress: !g.exact, dimmed: g.allKept, dismiss: { dismiss() })
+                    DuplicateRow(bookmark: b, showAddress: !g.exact, dimmed: g.allKept)
                 }
             }
         }
@@ -97,7 +99,6 @@ struct DuplicateRow: View {
     let bookmark: Bookmark
     let showAddress: Bool
     let dimmed: Bool
-    let dismiss: () -> Void
     @State private var confirmDelete = false
 
     var body: some View {
@@ -117,8 +118,9 @@ struct DuplicateRow: View {
             }
             .layoutPriority(1)
             Spacer(minLength: 8)
-            Button("Show in place") { dismiss(); model.reveal(bookmark: bookmark.id); front() }.controlSize(.small).fixedSize()
-            Button("Edit…") { dismiss(); model.sheet = .editBookmark(bookmark); front() }.controlSize(.small).fixedSize()
+            // the list stays open (Matt, Nov 8 2026): the main window comes forward beside it
+            Button("Show in place") { model.reveal(bookmark: bookmark.id); ReportWindows.frontMain() }.controlSize(.small).fixedSize()
+            Button("Edit…") { model.sheet = .editBookmark(bookmark); ReportWindows.frontMain() }.controlSize(.small).fixedSize()
             Button("Delete…") { confirmDelete = true }.controlSize(.small).fixedSize()
         }
         .padding(.horizontal, 12).padding(.vertical, 8).padding(.leading, 12)
@@ -130,5 +132,4 @@ struct DuplicateRow: View {
     }
 
     /// From the Settings window, the main window comes forward to show the row or the editor.
-    private func front() { NSApp.windows.first { $0.identifier?.rawValue == "main" }?.makeKeyAndOrderFront(nil) }
 }

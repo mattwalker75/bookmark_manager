@@ -105,7 +105,7 @@ final class NetworkReviewTests: XCTestCase {
         let i = try XCTUnwrap(lib.tabs[0].bookmarks.firstIndex { !$0.isSecretOnly })
         lib.tabs[0].bookmarks[i].url = "http://127.0.0.1:\(server.port)/gone"
         m.importFileForTest(lib)
-        m.checkLinks(inMainWindow: false)
+        m.checkLinks()
         while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
         let first = try XCTUnwrap(m.linkReport)
         XCTAssertEqual(first.problems.count, 1)
@@ -113,7 +113,7 @@ final class NetworkReviewTests: XCTestCase {
         var slow = m.library
         for t in slow.tabs.indices { for j in slow.tabs[t].bookmarks.indices where !slow.tabs[t].bookmarks[j].isSecretOnly { slow.tabs[t].bookmarks[j].url = "http://127.0.0.1:\(server.port)/slow\(t)\(j)" } }
         m.importFileForTest(slow)
-        m.checkLinks(inMainWindow: false)
+        m.checkLinks()
         try await Task.sleep(nanoseconds: 200_000_000)
         m.cancelLinkCheck()
         while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
@@ -223,7 +223,7 @@ final class ClearLinkMarkTests: XCTestCase {
         let b = Bookmark(name: "Fine site", url: "http://127.0.0.1:\(server.port)/fine")
         try lib.addBookmark(a, in: tab); try lib.addBookmark(b, in: tab)
         m.importFileForTest(lib)
-        m.checkLinks(inMainWindow: false)
+        m.checkLinks()
         while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
         XCTAssertEqual(m.linkProblems.keys.first, a.id)
         // once: the mark goes, the next check brings it back
@@ -231,18 +231,18 @@ final class ClearLinkMarkTests: XCTestCase {
         XCTAssertTrue(m.linkProblems.isEmpty)
         XCTAssertTrue(LinkReport.load(from: m.store.folder)?.problems.isEmpty ?? false, "saved")
         XCTAssertFalse(m.library.bookmark(a.id)!.skipLinkCheck)
-        m.checkLinks(inMainWindow: false)
+        m.checkLinks()
         while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
         XCTAssertEqual(m.linkProblems.keys.first, a.id)
         // for good: the mark goes, the bookmark is left out of the next check, and the editor can turn it back on
         m.clearLinkProblem(a.id, forever: true)
         XCTAssertTrue(m.linkProblems.isEmpty)
         XCTAssertTrue(m.library.bookmark(a.id)!.skipLinkCheck)
-        m.checkLinks(inMainWindow: false)
+        m.checkLinks()
         while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
         XCTAssertTrue(m.linkProblems.isEmpty); XCTAssertEqual(m.linkReport?.checked, 1)
         var back = m.library.bookmark(a.id)!; back.skipLinkCheck = false; m.updateBookmark(back)
-        m.checkLinks(inMainWindow: false)
+        m.checkLinks()
         while m.linkCheckRunning { try await Task.sleep(nanoseconds: 50_000_000) }
         XCTAssertEqual(m.linkProblems.keys.first, a.id)
         // the flag travels with an export and reads leniently
